@@ -20,6 +20,7 @@ import android.support.v4.util.LongSparseArray;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -192,14 +193,20 @@ public class MMHook implements IXposedHookLoadPackage {
 			}
 		});
 	}
-	
+	private Map<ListAdapter, ListView> listViewMap = new HashMap<ListAdapter, ListView>();
 	private void hookClickChattingItem() throws Exception {
+		final Class<?> conversationListViewClass = classLoader.loadClass("com.tencent.mm.ui.conversation.ConversationOverscrollListView");
+		final Class<?> conversationAdapterClass = classLoader.loadClass("com.tencent.mm.ui.conversation.d");
 		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new XC_MethodHook() {
 			@Override
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 				XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName());
 				if(param.args != null && param.args.length > 0 && param.args[0] != null) {
 					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + " --> " + param.args[0].getClass().getName());
+					if(param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
+						return;
+					}
+					listViewMap.put((ListAdapter)param.args[0], (ListView)param.thisObject);
 				}
 			}
 		});
@@ -208,38 +215,21 @@ public class MMHook implements IXposedHookLoadPackage {
 			XposedBridge.log("com.tencent.mm.storage.r is null");
 			return;
 		}
+		final Field usernameField = conversationItemClass.getField("field_username");
 		ReflectUtil.cacheFields(conversationItemClass);
-		// 发现栏目
+		
+		
+		// 聊天室或发现栏目
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.d", classLoader, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				XposedBridge.log("com.tencent.mm.ui.conversation.d.getView");
-				View view = (View) param.getResult();
+				final View view = (View) param.getResult();
 				if(view == null) {
 					return;
 				}
-//				Utils.printViewAndSubView(view);
-//				if(!Utils.instanceOf(view, LinearLayout.class)) {
-//					return;
-//				}
-//				LinearLayout ll = (LinearLayout) view;
-//				if(ll.getChildCount() != 2) {
-//					return;
-//				}
-//				if(!Utils.instanceOf(ll.getChildAt(0), RelativeLayout.class)) {
-//					return;
-//				}
-//				if(!Utils.instanceOf(ll.getChildAt(1), LinearLayout.class)) {
-//					return;
-//				}
-//				RelativeLayout rl = (RelativeLayout) ll.getChildAt(0);
-//				if(rl.getChildCount() != 1 || Utils.instanceOf(rl.getChildAt(0), ImageView.class)) {
-//					return;
-//				}
-//				XposedBridge.log("com.tencent.mm.ui.conversation.d.getView foundview");
-				// 不写了，应该能基本确定该布局了
-				Integer pos = (Integer) param.args[0];
-				ListAdapter adapter = (ListAdapter) param.thisObject;
+				final Integer pos = (Integer) param.args[0];
+				final ListAdapter adapter = (ListAdapter) param.thisObject;
 				XposedBridge.log("conversation: pos: " + pos + " size: " + adapter.getCount());
 				if(pos < 0 || pos >= adapter.getCount()) {
 					return;
@@ -254,109 +244,39 @@ public class MMHook implements IXposedHookLoadPackage {
 					return;
 				}
 				XposedBridge.log("conversation: " + ReflectUtil.getFieldInfos(item));
-//				public int field_atCount;
-//				public int field_attrflag;
-//				public int field_chatmode;
-//				public String field_content;
-//				public long field_conversationTime;
-//				private String field_customNotify;
-//				public String field_digest;
-//				public String field_digestUser;
-//				public String field_editingMsg;
-//				public long field_flag;
-//				private int field_hasTrunc;
-//				public int field_isSend;
-//				public int field_msgCount;
-//				public String field_msgType;
-//				public String field_parentRef;
-//				public int field_showTips;
-//				public long field_sightTime;
-//				public int field_status;
-//				public int field_unReadCount;
-//				public int field_unReadMuteCount;
-//				public String field_username;
+				
+				String userName = (String) usernameField.get(item);
+				if(userName == null) {
+					return;
+				}
+				ContentValues values = allMsgs.get(curMsgId);
+				if(values == null) {
+					return;
+				}
+				String talker = values.getAsString("talker");
+				if(talker == null) {
+					return;
+				}
+				XposedBridge.log("getView matchroom" + userName + " --> " + talker);
+				if(!userName.equals(talker)) {
+					return;
+				}
+				final ListView listView = listViewMap.get(adapter);
+				XposedBridge.log("findListView: " + listView);
+
+				final int viewPos = listView.getPositionForView(view);
+				XposedBridge.log("findListView: " + pos + " " + viewPos + " " + adapter.getItemId(viewPos));
+				listView.performItemClick(view, pos, adapter.getItemId(pos));
+				postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						XposedBridge.log("findListView delay: " + pos + " " + viewPos + " " + adapter.getItemId(viewPos));
+						listView.performItemClick(view, viewPos, adapter.getItemId(viewPos));
+					}
+				}, 5000);
 			}
 		});
 		
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.base.preference.h", classLoader, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				XposedBridge.log("com.tencent.mm.ui.base.preference.h.getView");
-				View view = (View) param.getResult();
-				if(view == null) {
-					return;
-				}
-//				Utils.printViewAndSubView(view);
-//				if(!Utils.instanceOf(view, LinearLayout.class)) {
-//					return;
-//				}
-//				LinearLayout ll = (LinearLayout) view;
-//				if(ll.getChildCount() != 2) {
-//					return;
-//				}
-//				if(!Utils.instanceOf(ll.getChildAt(0), RelativeLayout.class)) {
-//					return;
-//				}
-//				if(!Utils.instanceOf(ll.getChildAt(1), LinearLayout.class)) {
-//					return;
-//				}
-//				RelativeLayout rl = (RelativeLayout) ll.getChildAt(0);
-//				if(rl.getChildCount() != 1 || Utils.instanceOf(rl.getChildAt(0), ImageView.class)) {
-//					return;
-//				}
-//				XposedBridge.log("com.tencent.mm.ui.base.preference.h.getView foundview");
-				// 不写了，应该能基本确定该布局了
-				Integer pos = (Integer) param.args[0];
-				ListAdapter adapter = (ListAdapter) param.thisObject;
-				if(pos < 0 || adapter.getCount() >= pos) {
-					return;
-				}
-				Object item = adapter.getItem(pos);
-				if(item != null) {
-					XposedBridge.log("com.tencent.mm.ui.base.preference.h.getView: " + item.getClass().getName() + " -> " + item.toString());
-				}
-			}
-		});
-		
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.chatting.cj", classLoader, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				XposedBridge.log("com.tencent.mm.ui.chatting.cj.getView");
-				View view = (View) param.getResult();
-				if(view == null) {
-					return;
-				}
-//				Utils.printViewAndSubView(view);
-//				if(!Utils.instanceOf(view, LinearLayout.class)) {
-//					return;
-//				}
-//				LinearLayout ll = (LinearLayout) view;
-//				if(ll.getChildCount() != 2) {
-//					return;
-//				}
-//				if(!Utils.instanceOf(ll.getChildAt(0), RelativeLayout.class)) {
-//					return;
-//				}
-//				if(!Utils.instanceOf(ll.getChildAt(1), LinearLayout.class)) {
-//					return;
-//				}
-//				RelativeLayout rl = (RelativeLayout) ll.getChildAt(0);
-//				if(rl.getChildCount() != 1 || Utils.instanceOf(rl.getChildAt(0), ImageView.class)) {
-//					return;
-//				}
-//				XposedBridge.log("com.tencent.mm.ui.chatting.cj.getView foundview");
-				// 不写了，应该能基本确定该布局了
-				Integer pos = (Integer) param.args[0];
-				ListAdapter adapter = (ListAdapter) param.thisObject;
-				if(pos < 0 || adapter.getCount() >= pos) {
-					return;
-				}
-				Object item = adapter.getItem(pos);
-				if(item != null) {
-					XposedBridge.log("com.tencent.mm.ui.chatting.cj.getView: " + item.getClass().getName() + " -> " + item.toString());
-				}
-			}
-		});
 	}
 
 
