@@ -263,17 +263,19 @@ public class MMHook implements IXposedHookLoadPackage {
 				}
 				final ListView listView = listViewMap.get(adapter);
 				XposedBridge.log("findListView: " + listView);
-
-				final int viewPos = listView.getPositionForView(view);
-				XposedBridge.log("findListView: " + pos + " " + viewPos + " " + adapter.getItemId(viewPos));
-				listView.performItemClick(view, pos, adapter.getItemId(pos));
 				postDelayed(new Runnable() {
 					@Override
 					public void run() {
-						XposedBridge.log("findListView delay: " + pos + " " + viewPos + " " + adapter.getItemId(viewPos));
-						listView.performItemClick(view, viewPos, adapter.getItemId(viewPos));
+						XposedBridge.log("findListView delay: " + pos);
+						listView.performItemClick(view, pos, adapter.getItemId(pos));
 					}
 				}, 5000);
+				final int viewPos = listView.getPositionForView(view);
+				
+				XposedBridge.log("findListView: " + pos + " " + viewPos + " " + adapter.getItemId(viewPos));
+				
+				listView.performItemClick(view, viewPos, adapter.getItemId(viewPos));
+				
 			}
 		});
 		
