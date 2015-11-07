@@ -1,6 +1,7 @@
 package com.noverguo.fuckredenvelope;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +47,30 @@ public class ReflectUtil {
 			buf.append(", ");
 		}
 		return buf.toString();
+	}
+	
+	public static Field getField(Class<?> clazz, String fieldName) {
+		while(clazz != null) {
+			try {
+				return clazz.getDeclaredField(fieldName);
+			} catch (NoSuchFieldException e) {
+				e.printStackTrace();
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return null;
+	}
+	
+	public static Method getMethod(Class<?> clazz, String methodName) {
+		Method[] methods = clazz.getDeclaredMethods();
+		if(methods != null) {
+			for(Method method : methods) {
+				if(method.getName().equals(methodName)) {
+					return method;
+				}
+			}
+		}
+		return null;
 	}
 	
 }

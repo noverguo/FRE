@@ -62,5 +62,16 @@ public class Utils {
 			}
 		}
 	}
-
+	public static String getPrintInfos(Object[] objs) {
+		StringBuilder buf = new StringBuilder();
+		if(objs != null) {
+			for(Object obj : objs) {
+				if(obj != null) {
+					buf.append(obj.getClass() + ": ");
+				}
+				buf.append(obj).append(", ");
+			}
+		}
+		return buf.toString();
+	}
 }

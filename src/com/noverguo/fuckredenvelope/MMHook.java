@@ -1,6 +1,7 @@
 package com.noverguo.fuckredenvelope;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -21,6 +22,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -221,6 +223,7 @@ public class MMHook implements IXposedHookLoadPackage {
 		
 		// 聊天室或发现栏目
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.d", classLoader, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
+			private long pre = 0;
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				XposedBridge.log("com.tencent.mm.ui.conversation.d.getView");
@@ -232,6 +235,10 @@ public class MMHook implements IXposedHookLoadPackage {
 				final ListAdapter adapter = (ListAdapter) param.thisObject;
 				XposedBridge.log("conversation: pos: " + pos + " size: " + adapter.getCount());
 				if(pos < 0 || pos >= adapter.getCount()) {
+					return;
+				}
+				long cur = curMsgId << 16 + pos;
+				if(cur == pre) {
 					return;
 				}
 				Object item = adapter.getItem(pos);
@@ -261,24 +268,31 @@ public class MMHook implements IXposedHookLoadPackage {
 				if(!userName.equals(talker)) {
 					return;
 				}
+				pre = cur;
 				final ListView listView = listViewMap.get(adapter);
-				XposedBridge.log("findListView: " + listView);
-				postDelayed(new Runnable() {
-					@Override
-					public void run() {
-						XposedBridge.log("findListView delay: " + pos);
-						listView.performItemClick(view, pos, adapter.getItemId(pos));
-					}
-				}, 5000);
-				final int viewPos = listView.getPositionForView(view);
-				
-				XposedBridge.log("findListView: " + pos + " " + viewPos + " " + adapter.getItemId(viewPos));
-				
-				listView.performItemClick(view, viewPos, adapter.getItemId(viewPos));
-				
+				XposedBridge.log("ListView: " + cur + " --> " + listView);
+				listView.performItemClick(view, pos + 7, adapter.getItemId(pos));
 			}
 		});
-		
+		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param)
+					throws Throwable {
+				if(param.args != null && param.args.length > 0 && param.args[0] != null) {
+					OnItemClickListener listener = (OnItemClickListener) param.args[0];
+					XposedBridge.log("setOnItemClickListener: " + listener);
+					Class<? extends OnItemClickListener> itemListenerClass = listener.getClass();
+					Method method = ReflectUtil.getMethod(itemListenerClass, "onItemClick");
+					if(method != null) {
+						XposedBridge.hookAllMethods(itemListenerClass, method.getName(), new XC_MethodHook() {
+							protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+								XposedBridge.log("onItemClick: " + Utils.getPrintInfos(param.args));
+							};
+						});
+					}
+				}
+			}
+		});
 	}
 
 
