@@ -25,6 +25,7 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListAdapter;
@@ -70,6 +71,8 @@ public class MMHook implements IXposedHookLoadPackage {
 		hookLateSoClose();
 		// 检测消息的View，并根据需要进行点击
 		hookMsgView();
+		// 检测到红包后需要自动发送消息，以表示对他人的尊重
+		hookAutoSendMsg();
 		
 		hookForTest();
 	}
@@ -294,6 +297,44 @@ public class MMHook implements IXposedHookLoadPackage {
 			}
 		});
 	}
+	
+	private ImageButton switchToTalk;
+	private ImageButton switchToKeyboard;
+	
+	private void hookAutoSendMsg() throws Exception {
+		final Class<?> mmEditTextClass = classLoader.loadClass("com.tencent.mm.ui.widget.MMEditText");
+		XposedHelpers.findAndHookMethod(TextView.class, "handleTextChanged", CharSequence.class, int.class, int.class, int.class, new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param)
+					throws Throwable {
+				TextView tv = (TextView) param.thisObject;
+				if(tv.getClass() != mmEditTextClass) {
+					return;
+				}
+				XposedBridge.log("handleTextChanged: " + tv.getClass().getName());
+			}
+			
+		});
+		
+		
+		XposedBridge.hookAllConstructors(ImageButton.class, new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param)
+					throws Throwable {
+				ImageButton ib = (ImageButton) param.thisObject;
+				CharSequence contentDescription = ib.getContentDescription();
+				if(contentDescription == null) {
+					return;
+				}
+				if(contentDescription.equals("切换到按住说话")) {
+					switchToTalk = ib;
+				} else if(contentDescription.equals("切换到键盘")) {
+					switchToKeyboard = ib;
+				}
+			}
+		});
+		
+	}
 
 
 	static MatchView[] redEnvelopeChildViewClasses;
@@ -392,12 +433,16 @@ public class MMHook implements IXposedHookLoadPackage {
 		XposedHelpers.findAndHookMethod(TextView.class, "setText", CharSequence.class, BufferType.class, new XC_MethodHook() {
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				if(status == STATUS_NOTHING) {
+					return;
+				}
 				CharSequence text = (CharSequence) param.args[0];
 				if(text == null || !text.equals("手慢了，红包派完了")) {
 					return;
 				}
 				XposedBridge.log("发现 “手慢了，红包派完了”");
 				TextView tv = (TextView) param.thisObject;
+				
 				ViewParent parent = tv.getParent();
 				if(!Utils.instanceOf(parent, LinearLayout.class, true)) {
 					return;
@@ -426,6 +471,9 @@ public class MMHook implements IXposedHookLoadPackage {
 		XposedHelpers.findAndHookMethod("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI", classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
 			@Override
 			protected void afterHookedMethod(final MethodHookParam param) throws Throwable {
+				if(status == STATUS_NOTHING) {
+					return;
+				}
 				XposedBridge.log("查看完红包，点击关闭 ");
 				end();
 				if(status == STATUS_NOTHING) {
