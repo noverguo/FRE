@@ -13,4 +13,5 @@ public class FREApplication extends Application {
 	public static Context getContext() {
 		return context;
 	}
+	
 }

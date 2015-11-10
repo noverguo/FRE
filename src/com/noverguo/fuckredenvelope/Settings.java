@@ -13,7 +13,7 @@ public class Settings {
 		if(strTalks == null) {
 			return null;
 		}
-		return strTalks.split(",");
+		return strTalks.split(";");
 	}
 	
 	public static void setTalks(String[] talks) {
@@ -25,7 +25,7 @@ public class Settings {
 			if(talk == null) {
 				continue;
 			}
-			buf.append(talk).append(",");
+			buf.append(talk).append(";");
 		}
 		if(buf.length() == 0) {
 			return;

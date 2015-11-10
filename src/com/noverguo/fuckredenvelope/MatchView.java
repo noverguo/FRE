@@ -1,10 +1,11 @@
 package com.noverguo.fuckredenvelope;
-public class MatchView {
-		int idx;
-		Class<?>[] viewClasses;
 
-		public MatchView(int idx, Class<?>[] viewClasses) {
-			this.idx = idx;
-			this.viewClasses = viewClasses;
-		}
+public class MatchView {
+	public int idx;
+	public Class<?>[] viewClasses;
+
+	public MatchView(int idx, Class<?>[] viewClasses) {
+		this.idx = idx;
+		this.viewClasses = viewClasses;
 	}
+}

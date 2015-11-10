@@ -1,7 +1,8 @@
-package com.noverguo.fuckredenvelope;
+package com.noverguo.fuckredenvelope.mm;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -10,14 +11,17 @@ import java.util.Set;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
+import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.v4.util.LongSparseArray;
+import android.telephony.TelephonyManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -33,6 +37,15 @@ import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.TextView.BufferType;
+
+import com.noverguo.fuckredenvelope.ClickView;
+import com.noverguo.fuckredenvelope.MatchView;
+import com.noverguo.fuckredenvelope.ReflectUtil;
+import com.noverguo.fuckredenvelope.TelephonyProperties;
+import com.noverguo.fuckredenvelope.Utils;
+import com.noverguo.fuckredenvelope.receiver.SettingReceiver;
+import com.noverguo.fuckredenvelope.receiver.UnlockReceiver;
+
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -40,16 +53,18 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
 public class MMHook implements IXposedHookLoadPackage {
-	public static final String RED_ENVELOPE = "红包";
+	public static final String ACTION_TALKS = "com.noverguo.fuckredenvelope.mm.MMHook.ACTION_TALKS";
+	public static final String KEY_TALKS = "com.noverguo.fuckredenvelope.mm.MMHook.KEY_TALKS";
 	private static final int STATUS_NOTHING = 0;
 	private static final int STATUS_START_ACTIVITY = 1;
 	private static final int STATUS_CLICK_RED_ENVELOPE_VIEW = 2;
 	private ClassLoader classLoader;
 	private Context context;
-	private LongSparseArray<ContentValues> allMsgs = new LongSparseArray<ContentValues>();
-	private LongSparseArray<ContentValues> redEnvelopMsgs = new LongSparseArray<ContentValues>();
+	private LongSparseArray<Msg> allMsgs = new LongSparseArray<Msg>();
+	private LongSparseArray<Msg> redEnvelopMsgs = new LongSparseArray<Msg>();
 	private Map<View, ClickView> clickCallbackMap = new HashMap<View, ClickView>();
 	private Set<Long> doneMsgIds = new HashSet<Long>();
+	private Set<String> grepTalks = new HashSet<String>();
 	private int status = STATUS_NOTHING;
 	private long curMsgId = -1;
 	Handler uiHandler;
@@ -61,6 +76,8 @@ public class MMHook implements IXposedHookLoadPackage {
 		XposedBridge.log("find wechat app: " + lpparam.packageName);
 
 		initContext(lpparam);
+		// 不给读imei和imsi，以免封号
+		hookReadImeiAndImsi();
 		// 读取消息，发现红包则启动窗口
 		hookReadMsg();
 		// 启动窗口后，可能会停在消息列表窗口（具体原因待查），这时需要去点击进入对应的窗口
@@ -76,26 +93,73 @@ public class MMHook implements IXposedHookLoadPackage {
 		
 		hookForTest();
 	}
-
+	
+	private BroadcastReceiver talksReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			if(ACTION_TALKS.equals(intent.getAction())) {
+				String[] talks = intent.getStringArrayExtra(KEY_TALKS);
+				grepTalks.clear();
+				if(talks != null) {
+					grepTalks.addAll(Arrays.asList(talks));
+				}
+			}
+		}
+	};
 
 	private void initContext(final LoadPackageParam lpparam) {
 		this.classLoader = lpparam.classLoader;
-		XposedHelpers.findAndHookMethod("android.app.Application", classLoader, "onCreate", new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				context = (Context) param.thisObject;
-				// XposedBridge.log("android.app.Application: " + context);
-			}
-		});
 		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new XC_MethodHook() {
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				context = (Context) param.thisObject;
-				// XposedBridge.log("com.tencent.mm.app.MMApplication: " +
-				// context);
+				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
+				context.registerReceiver(talksReceiver, intentFilter);
+			}
+		});
+		
+		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				context = (Context) param.thisObject;
+				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
+				context.registerReceiver(talksReceiver, intentFilter);
 			}
 		});
 	}
+	
+	private void hookReadImeiAndImsi() {
+//		1）获取运营商sim卡imsi号：
+//		 String android_imsi = telephonyManager.getSubscriberId();//获取手机IMSI号 
+//		 String IMSI = android.os.SystemProperties.get(android.telephony.TelephonyProperties.PROPERTY_IMSI);
+//		2）获取IME标识两种方法(手机唯一的标识)
+//		String imei = ((TelephonyManager) context.getSystemService(TELEPHONY_SERVICE)).getDeviceId();
+//		String IMEI = android.os.SystemProperties.get(android.telephony.TelephonyProperties.PROPERTY_IMEI)
+		XposedHelpers.findAndHookMethod(TelephonyManager.class, "getSubscriberId", new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				param.setResult("");
+			}
+		});
+		XposedHelpers.findAndHookMethod(TelephonyManager.class, "getDeviceId", new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				param.setResult("");
+			}
+		});
+		XposedHelpers.findAndHookMethod("android.os.SystemProperties", classLoader, "get", String.class, getPropertiesHook);
+		XposedHelpers.findAndHookMethod("android.os.SystemProperties", classLoader, "get", String.class, String.class, getPropertiesHook);
+	}
+	
+	XC_MethodHook getPropertiesHook = new XC_MethodHook() {
+		@Override
+		protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			String key = (String) param.args[0];
+			if(TelephonyProperties.PROPERTY_IMEI.equals(key)) {
+				param.setResult("");
+			}
+		}
+	};
 
 	private void hookReadMsg() {
 		XposedHelpers.findAndHookMethod(ContentValues.class, "size", new XC_MethodHook() {
@@ -111,17 +175,15 @@ public class MMHook implements IXposedHookLoadPackage {
 					e.printStackTrace();
 				}
 				ContentValues values = (ContentValues) param.thisObject;
-				if (!values.containsKey("msgId") || !values.containsKey("content")) {
+				Msg msg = new Msg(values);
+				if (msg.msgId == null || msg.content == null) {
 					return;
 				}
-				Long msgId = values.getAsLong("msgId");
-				if (msgId == null) {
+				if (allMsgs.get(msg.msgId) != null) {
 					return;
 				}
-				if (allMsgs.get(msgId) != null) {
-					return;
-				}
-				allMsgs.put(msgId, values);
+				allMsgs.put(msg.msgId, msg);
+				
 				StringBuilder buf = new StringBuilder("newMsg --> ");
 				for(String key : values.keySet()) {
 					buf.append(key).append(": ");
@@ -135,14 +197,28 @@ public class MMHook implements IXposedHookLoadPackage {
 					}
 				}
 				XposedBridge.log(buf.toString());
-				String content = values.getAsString("content");
-				XposedBridge.log("有新的消息: " + msgId + ": " + content + " status: " + status);
+				
+				String content = msg.content;
+				XposedBridge.log("有新的消息: " + msg.msgId + ": " + content + " status: " + status);
 				if (content == null) {
 					return;
 				}
 				if (content.contains("领取红包") && content.contains("微信红包") && content.contains("查看红包")) {
-					redEnvelopMsgs.put(msgId, values);
-					startFuckRedEnvelop(msgId, values);
+					if(!grepTalks.isEmpty()) {
+						String talker = values.getAsString("talker");
+						if(talker == null || !grepTalks.contains(talker)) {
+							return;
+						}
+					}
+					
+					redEnvelopMsgs.put(msg.msgId, msg);
+					
+//					context.startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setClassName("com.noverguo.fuckredenvelope", "com.noverguo.fuckredenvelope.ui.SettingActivity"));
+					
+					startFuckRedEnvelop(msg);
+					
+					// 解锁屏幕
+					context.sendBroadcast(new Intent(UnlockReceiver.ACTION_UNLOCK));
 				}
 			}
 
@@ -198,6 +274,7 @@ public class MMHook implements IXposedHookLoadPackage {
 			}
 		});
 	}
+	private Map<String, String> allTalks = new HashMap<String, String>();
 	private Map<ListAdapter, ListView> listViewMap = new HashMap<ListAdapter, ListView>();
 	private void hookClickChattingItem() throws Exception {
 		final Class<?> conversationListViewClass = classLoader.loadClass("com.tencent.mm.ui.conversation.ConversationOverscrollListView");
@@ -240,10 +317,6 @@ public class MMHook implements IXposedHookLoadPackage {
 				if(pos < 0 || pos >= adapter.getCount()) {
 					return;
 				}
-				long cur = curMsgId << 16 + pos;
-				if(cur == pre) {
-					return;
-				}
 				Object item = adapter.getItem(pos);
 				XposedBridge.log("conversation: " + item);
 				if(item == null) {
@@ -253,22 +326,29 @@ public class MMHook implements IXposedHookLoadPackage {
 				if(item.getClass() != conversationItemClass) {
 					return;
 				}
-				XposedBridge.log("conversation: " + ReflectUtil.getFieldInfos(item));
 				
 				String userName = (String) usernameField.get(item);
 				if(userName == null) {
 					return;
 				}
-				ContentValues values = allMsgs.get(curMsgId);
-				if(values == null) {
+				if(!allTalks.containsKey(userName)) {
+					allTalks.put(userName, "");
+					updateTalks();
+				}
+				XposedBridge.log("conversation: " + ReflectUtil.getFieldInfos(item));
+				long cur = curMsgId << 16 + pos;
+				if(cur == pre) {
 					return;
 				}
-				String talker = values.getAsString("talker");
-				if(talker == null) {
+				Msg msg = allMsgs.get(curMsgId);
+				if(msg == null) {
 					return;
 				}
-				XposedBridge.log("getView matchroom" + userName + " --> " + talker);
-				if(!userName.equals(talker)) {
+				if(msg.talker == null) {
+					return;
+				}
+				XposedBridge.log("getView matchroom" + userName + " --> " + msg.talker);
+				if(!userName.equals(msg.talker)) {
 					return;
 				}
 				pre = cur;
@@ -296,6 +376,23 @@ public class MMHook implements IXposedHookLoadPackage {
 				}
 			}
 		});
+	}
+	private Runnable updateToView = new Runnable() {
+		@Override
+		public void run() {
+			String[] values = new String[allTalks.size()];
+			int i=0;
+			for(String key : allTalks.keySet()) {
+				values[i] = key + "," + allTalks.get(key);
+				XposedBridge.log("updateToView: " + values[i]);
+				++i;
+			}
+			context.sendBroadcast(new Intent(SettingReceiver.ACTION_TALKS).putExtra(SettingReceiver.KEY_TALKS, values));
+			allTalks.clear();
+		}
+	};
+	private void updateTalks() {
+		postDelayed(updateToView, 1000);
 	}
 	
 	private ImageButton switchToTalk;
@@ -488,6 +585,7 @@ public class MMHook implements IXposedHookLoadPackage {
 		if(uiHandler == null) {
 			uiHandler = new Handler(Looper.getMainLooper());
 		}
+		uiHandler.removeCallbacks(runnable);
 		uiHandler.postDelayed(runnable, delayMillis);
 	}
 	
@@ -507,27 +605,27 @@ public class MMHook implements IXposedHookLoadPackage {
 	}
 	
 	
-	protected void startFuckRedEnvelop(long msgId, final ContentValues values) throws Exception {
-		if(status != STATUS_NOTHING || values == null) {
+	protected void startFuckRedEnvelop(Msg msg) throws Exception {
+		if(status != STATUS_NOTHING || msg == null) {
 			return;
 		}
-		curMsgId = msgId;
+		curMsgId = msg.msgId;
 		status = STATUS_START_ACTIVITY;
-		startActivity(values);
+		startActivity(msg);
 	}
 
-	private void startActivity(final ContentValues values) throws ClassNotFoundException, CanceledException {
+	private void startActivity(final Msg msg) throws ClassNotFoundException, CanceledException {
 		final Intent intent = new Intent(context, classLoader.loadClass("com.tencent.mm.ui.LauncherUI"));
 		intent.putExtra("talkerCount", 1);
 		intent.putExtra("nofification_type", "new_msg_nofification");
 		intent.putExtra("Intro_Bottle_unread_count", 0);
-		intent.putExtra("MainUI_User_Last_Msg_Type", values.getAsInteger("type"));
+		intent.putExtra("MainUI_User_Last_Msg_Type", msg.type);
 		intent.putExtra("Intro_Is_Muti_Talker", false);
-		intent.putExtra("Main_User", values.getAsString("talker"));
+		intent.putExtra("Main_User",msg.talker);
 		intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
 		intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 		// intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-		XposedBridge.log("启动有红包的界面: " + values.getAsInteger("type") + "  " + values.getAsString("talker") + " status: " + status);
+		XposedBridge.log("启动有红包的界面: " + msg.type + "  " + msg.talker + " status: " + status);
 		PendingIntent.getActivity(context, 4097, intent, PendingIntent.FLAG_UPDATE_CURRENT).send();
 		postDelayed(new Runnable() {
 			@Override
@@ -565,7 +663,7 @@ public class MMHook implements IXposedHookLoadPackage {
 			return;
 		}
 		long key = redEnvelopMsgs.keyAt(0);
-		startFuckRedEnvelop(key, redEnvelopMsgs.get(key));
+		startFuckRedEnvelop(redEnvelopMsgs.get(key));
 	}
 	
 
@@ -602,17 +700,6 @@ public class MMHook implements IXposedHookLoadPackage {
 		XposedBridge.hookAllMethods(ContextWrapper.class, "startActivityAsUser", startActivityCallback);
 		XposedBridge.hookAllMethods(Activity.class, "startActivityForResult", startActivityCallback);
 //		android.support.v4.app.Fragment.a(Context paramContext, String paramString, Bundle paramBundle)
-		XposedHelpers.findAndHookMethod("android.support.v4.app.Fragment", classLoader, "a", Context.class, String.class, Bundle.class, new XC_MethodHook() {
-			@Override
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				Object obj0 = param.args[0];
-				Object obj1 = param.args[1];
-				XposedBridge.log("Fragment a: " + obj0 + "  " + obj1);
-				if(obj0 != null) {
-					XposedBridge.log("Fragment a: " + obj0 + "  " + obj0.getClass().getName());
-				}
-			}
-		});
 		
 		XposedHelpers.findAndHookMethod("android.support.v4.app.Fragment", classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
 			@Override

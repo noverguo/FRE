@@ -1,10 +1,14 @@
 package com.noverguo.fuckredenvelope.receiver;
 
-import com.noverguo.fuckredenvelope.Settings;
+import java.util.Arrays;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
+
+import com.noverguo.fuckredenvelope.Settings;
+import com.noverguo.fuckredenvelope.TalkSel;
 
 public class SettingReceiver extends BroadcastReceiver {
 	public static final String ACTION_TALKS = "com.noverguo.fuckredenvelope.receiver.SettingReceiver";
@@ -15,9 +19,28 @@ public class SettingReceiver extends BroadcastReceiver {
 			return;
 		}
 		String action = intent.getAction();
+		Log.e("SR", "SettingReceiver: " + action);
 		if(ACTION_TALKS.equals(action)) {
 			String[] talks = intent.getStringArrayExtra(KEY_TALKS);
+			Log.e("SR", "SettingReceiver talks: " + talks);
 			if(talks != null) {
+				Log.e("SR", "SettingReceiver talks: " + Arrays.asList(talks));
+				String[] oldTalks = Settings.getTalks();
+				if(oldTalks != null) {
+					for(int i=0;i<talks.length;++i) {
+						TalkSel ts = new TalkSel(talks[i]);
+						if(ts.talkName == null) {
+							Log.e("SR", "SettingReceiver null:" + talks[i]);
+							talks[i] = null;
+						}
+						for(String oldTalk : oldTalks) {
+							if(ts.equals(new TalkSel(oldTalk))) {
+								talks[i] = oldTalk;
+								break;
+							}
+						}
+					}
+				}
 				Settings.setTalks(talks);
 			}
 		}
