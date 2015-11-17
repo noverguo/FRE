@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import android.app.Activity;
 import android.app.PendingIntent;
@@ -60,6 +61,7 @@ public class MMHook implements IXposedHookLoadPackage {
 	private static final int STATUS_CLICK_RED_ENVELOPE_VIEW = 2;
 	private ClassLoader classLoader;
 	private Context context;
+	private LinkedBlockingDeque<Msg> queue = new LinkedBlockingDeque<Msg>();
 	private LongSparseArray<Msg> allMsgs = new LongSparseArray<Msg>();
 	private LongSparseArray<Msg> redEnvelopMsgs = new LongSparseArray<Msg>();
 	private Map<View, ClickView> clickCallbackMap = new HashMap<View, ClickView>();
@@ -182,6 +184,13 @@ public class MMHook implements IXposedHookLoadPackage {
 				if (allMsgs.get(msg.msgId) != null) {
 					return;
 				}
+				while(queue.size() > 50) {
+					long rmId = queue.removeFirst().msgId;
+					if(redEnvelopMsgs.get(rmId) == null) {
+						allMsgs.remove(rmId);
+					}
+				}
+				queue.add(msg);
 				allMsgs.put(msg.msgId, msg);
 				
 				StringBuilder buf = new StringBuilder("newMsg --> ");
