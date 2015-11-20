@@ -23,6 +23,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.v4.util.LongSparseArray;
 import android.telephony.TelephonyManager;
+import android.util.SparseIntArray;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -58,7 +59,12 @@ public class MMHook implements IXposedHookLoadPackage {
 	public static final String KEY_TALKS = "com.noverguo.fuckredenvelope.mm.MMHook.KEY_TALKS";
 	private static final int STATUS_NOTHING = 0;
 	private static final int STATUS_START_ACTIVITY = 1;
-	private static final int STATUS_CLICK_RED_ENVELOPE_VIEW = 2;
+	private static final int STATUS_IN_ROOM = 2;
+	private static final int STATUS_CLICK_RED_ENVELOPE_VIEW = 3;
+	private static final int STAY_NOTTHING = 0;
+	private static final int STAY_IN_LIST = 1;
+	private static final int STAY_IN_ROOM = 2;
+	private static final int STAY_OTHER = 3;
 	private ClassLoader classLoader;
 	private Context context;
 	private LinkedBlockingDeque<Msg> queue = new LinkedBlockingDeque<Msg>();
@@ -68,8 +74,14 @@ public class MMHook implements IXposedHookLoadPackage {
 	private Set<Long> doneMsgIds = new HashSet<Long>();
 	private Set<String> grepTalks = new HashSet<String>();
 	private int status = STATUS_NOTHING;
+	private int stay = STAY_NOTTHING;
+	private String posTalker = null;
 	private long curMsgId = -1;
-	Handler uiHandler;
+	
+	private SparseIntArray itemMap = new SparseIntArray();
+	private static boolean inHook = false;
+	
+	private Handler uiHandler;
 
 	public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
 		if (!"com.tencent.mm".equals(lpparam.packageName)) {
@@ -88,12 +100,11 @@ public class MMHook implements IXposedHookLoadPackage {
 		hookRedEnvelopeClickListener();
 		// 发现是手慢了，红包派完了，则关闭
 		hookLateSoClose();
-		// 检测消息的View，并根据需要进行点击
+		// 检测消息的View，如发现有红包的View，则进行点击
 		hookMsgView();
 		// 检测到红包后需要自动发送消息，以表示对他人的尊重
-		hookAutoSendMsg();
-		
-		hookForTest();
+//		hookAutoSendMsg();
+//		hookForTest();
 	}
 	
 	private BroadcastReceiver talksReceiver = new BroadcastReceiver() {
@@ -111,21 +122,28 @@ public class MMHook implements IXposedHookLoadPackage {
 
 	private void initContext(final LoadPackageParam lpparam) {
 		this.classLoader = lpparam.classLoader;
-		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				context = (Context) param.thisObject;
 				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
 				context.registerReceiver(talksReceiver, intentFilter);
 			}
 		});
 		
-		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				context = (Context) param.thisObject;
 				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
 				context.registerReceiver(talksReceiver, intentFilter);
+			}
+		});
+		
+		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", classLoader, "onPause", new MM_MethodHook() {
+			@Override
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				stay = STAY_OTHER;
 			}
 		});
 	}
@@ -137,15 +155,15 @@ public class MMHook implements IXposedHookLoadPackage {
 //		2）获取IME标识两种方法(手机唯一的标识)
 //		String imei = ((TelephonyManager) context.getSystemService(TELEPHONY_SERVICE)).getDeviceId();
 //		String IMEI = android.os.SystemProperties.get(android.telephony.TelephonyProperties.PROPERTY_IMEI)
-		XposedHelpers.findAndHookMethod(TelephonyManager.class, "getSubscriberId", new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(TelephonyManager.class, "getSubscriberId", new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				param.setResult("");
 			}
 		});
-		XposedHelpers.findAndHookMethod(TelephonyManager.class, "getDeviceId", new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(TelephonyManager.class, "getDeviceId", new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				param.setResult("");
 			}
 		});
@@ -153,9 +171,9 @@ public class MMHook implements IXposedHookLoadPackage {
 		XposedHelpers.findAndHookMethod("android.os.SystemProperties", classLoader, "get", String.class, String.class, getPropertiesHook);
 	}
 	
-	XC_MethodHook getPropertiesHook = new XC_MethodHook() {
+	MM_MethodHook getPropertiesHook = new MM_MethodHook() {
 		@Override
-		protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+		protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 			String key = (String) param.args[0];
 			if(TelephonyProperties.PROPERTY_IMEI.equals(key)) {
 				param.setResult("");
@@ -164,10 +182,10 @@ public class MMHook implements IXposedHookLoadPackage {
 	};
 
 	private void hookReadMsg() {
-		XposedHelpers.findAndHookMethod(ContentValues.class, "size", new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(ContentValues.class, "size", new MM_MethodHook() {
 			boolean hookCloseDetail = false;
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				try {
 					if (!hookCloseDetail) {
 						hookCloseDetailRedEnvelope();
@@ -222,8 +240,6 @@ public class MMHook implements IXposedHookLoadPackage {
 					
 					redEnvelopMsgs.put(msg.msgId, msg);
 					
-//					context.startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setClassName("com.noverguo.fuckredenvelope", "com.noverguo.fuckredenvelope.ui.SettingActivity"));
-					
 					startFuckRedEnvelop(msg);
 					
 					// 解锁屏幕
@@ -233,15 +249,15 @@ public class MMHook implements IXposedHookLoadPackage {
 
 		});
 	}
-
+	
 	private void hookMsgView() throws Exception {
 //		com.tencent.mm.ui.chatting.cj.getView(int paramInt, View paramView, ViewGroup paramViewGroup)
 		final Class<?> msgClass = classLoader.loadClass("com.tencent.mm.storage.ad");
 		final Field msgIdField = msgClass.getField("field_msgId");
 		msgIdField.setAccessible(true);
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.chatting.cj", classLoader, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.chatting.cj", classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				View view = (View) param.getResult();
 				if(view == null) {
 					return;
@@ -258,6 +274,7 @@ public class MMHook implements IXposedHookLoadPackage {
 				if(item == null || item.getClass() != msgClass) {
 					return;
 				}
+				stay = STAY_IN_ROOM;
 				Long msgId = (Long) msgIdField.get(item);
 				XposedBridge.log("msgId: " + curMsgId + " -> " + msgId);
 				if(doneMsgIds.contains(msgId)) {
@@ -282,6 +299,59 @@ public class MMHook implements IXposedHookLoadPackage {
 				doneMsgIds.add(msgId);
 			}
 		});
+		final Method avCMethod = classLoader.loadClass("com.tencent.mm.ui.i").getMethod("avC", new Class<?>[0]);
+		if(avCMethod == null) {
+			XposedBridge.log("not found com.tencent.mm.ui.i.avC method");
+		}
+		
+		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", classLoader, "getCount", new MM_MethodHook() {
+			@Override
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				if(avCMethod == null || status == STATUS_NOTHING) {
+					return;
+				}
+				Integer count = (Integer) param.getResult();
+				BaseAdapter adapter = (BaseAdapter) param.thisObject;
+				Integer acv = (Integer) avCMethod.invoke(adapter, new Object[0]);
+				int curIdx = acv;
+				XposedBridge.log("com.tencent.mm.ui.i.getCount: " + acv + ", " + count);
+				itemMap.clear();
+				for(int i=acv;i<count;++i) {
+					Object item = adapter.getItem(i);
+					if(item == null) {
+						continue;
+					}
+					if(item.getClass() != msgClass) {
+						return;
+					}
+					Long msgId = (Long) msgIdField.get(item);
+					if(redEnvelopMsgs.get(msgId) != null) {
+						itemMap.put(curIdx, i);
+					}
+				}
+			}
+		});
+		
+		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", classLoader, "getItem", int.class, new MM_MethodHook() {
+			@Override
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				if(avCMethod == null || status == STATUS_NOTHING) {
+					return;
+				}
+				Object item = param.getResult();
+				if(item == null || item.getClass() != msgClass) {
+					return;
+				}
+				XposedBridge.log("com.tencent.mm.ui.i.getItem: " + (Integer)param.args[0]);
+				int val = itemMap.get(((Integer)param.args[0]), -999);
+				if(val == -999) {
+					return;
+				}
+				// 转移到红包的位置
+				BaseAdapter adapter = (BaseAdapter) param.thisObject;
+				param.setResult(adapter.getItem(val));
+			}
+		});
 	}
 	final static MatchView[] groupViewMatchViews;
 	static {
@@ -297,9 +367,9 @@ public class MMHook implements IXposedHookLoadPackage {
 		final Class<?> conversationListViewClass = classLoader.loadClass("com.tencent.mm.ui.conversation.ConversationOverscrollListView");
 		final Class<?> conversationAdapterClass = classLoader.loadClass("com.tencent.mm.ui.conversation.d");
 		// 关联adapter，便于之后使用
-		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new MM_MethodHook() {
 			@Override
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName());
 				if(param.args != null && param.args.length > 0 && param.args[0] != null) {
 					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + " --> " + param.args[0].getClass().getName());
@@ -330,10 +400,10 @@ public class MMHook implements IXposedHookLoadPackage {
 		}
 		
 		// 聊天室或发现栏目
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.d", classLoader, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.d", classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
 			private long pre = 0;
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				XposedBridge.log("com.tencent.mm.ui.conversation.d.getView");
 				final View view = (View) param.getResult();
 				if(view == null) {
@@ -360,8 +430,10 @@ public class MMHook implements IXposedHookLoadPackage {
 					return;
 				}
 				
-				String displayName = getDisplayName(view);
+				stay = STAY_IN_LIST;
+				posTalker = null;
 				
+				String displayName = getDisplayName(view);
 				if(!allTalks.containsKey(userName)) {
 					allTalks.put(userName, displayName);
 					updateTalks();
@@ -386,6 +458,9 @@ public class MMHook implements IXposedHookLoadPackage {
 				final ListView listView = listViewMap.get(adapter);
 				XposedBridge.log("ListView: " + cur + " --> " + listView);
 				listView.performItemClick(view, pos + 7, adapter.getItemId(pos));
+				
+				stay = STAY_IN_ROOM;
+				posTalker = userName;
 			}
 			
 			private String getDisplayName(View view) throws Exception {
@@ -410,9 +485,9 @@ public class MMHook implements IXposedHookLoadPackage {
 				return "";
 			}
 		});
-		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param)
+			protected void MM_afterHookedMethod(MethodHookParam param)
 					throws Throwable {
 				if(param.args != null && param.args.length > 0 && param.args[0] != null) {
 					OnItemClickListener listener = (OnItemClickListener) param.args[0];
@@ -420,8 +495,8 @@ public class MMHook implements IXposedHookLoadPackage {
 					Class<? extends OnItemClickListener> itemListenerClass = listener.getClass();
 					Method method = ReflectUtil.getMethod(itemListenerClass, "onItemClick");
 					if(method != null) {
-						XposedBridge.hookAllMethods(itemListenerClass, method.getName(), new XC_MethodHook() {
-							protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+						XposedBridge.hookAllMethods(itemListenerClass, method.getName(), new MM_MethodHook() {
+							protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 								XposedBridge.log("onItemClick: " + Utils.getPrintInfos(param.args));
 							};
 						});
@@ -451,11 +526,11 @@ public class MMHook implements IXposedHookLoadPackage {
 	private ImageButton switchToTalk;
 	private ImageButton switchToKeyboard;
 	
-	private void hookAutoSendMsg() throws Exception {
+	public void hookAutoSendMsg() throws Exception {
 		final Class<?> mmEditTextClass = classLoader.loadClass("com.tencent.mm.ui.widget.MMEditText");
-		XposedHelpers.findAndHookMethod(TextView.class, "handleTextChanged", CharSequence.class, int.class, int.class, int.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(TextView.class, "handleTextChanged", CharSequence.class, int.class, int.class, int.class, new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param)
+			protected void MM_afterHookedMethod(MethodHookParam param)
 					throws Throwable {
 				TextView tv = (TextView) param.thisObject;
 				if(tv.getClass() != mmEditTextClass) {
@@ -467,9 +542,9 @@ public class MMHook implements IXposedHookLoadPackage {
 		});
 		
 		
-		XposedBridge.hookAllConstructors(ImageButton.class, new XC_MethodHook() {
+		XposedBridge.hookAllConstructors(ImageButton.class, new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param)
+			protected void MM_afterHookedMethod(MethodHookParam param)
 					throws Throwable {
 				ImageButton ib = (ImageButton) param.thisObject;
 				CharSequence contentDescription = ib.getContentDescription();
@@ -505,10 +580,10 @@ public class MMHook implements IXposedHookLoadPackage {
 	
 	private void hookRedEnvelopeClickListener() throws ClassNotFoundException, NoSuchFieldException {
 //		final Class callbackClass = classLoader.loadClass("com.tencent.mm.ui.chatting.ck");
-		XposedHelpers.findAndHookMethod(View.class, "setOnClickListener", View.OnClickListener.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(View.class, "setOnClickListener", View.OnClickListener.class, new MM_MethodHook() {
 			View.OnClickListener clickCallback = null;
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				View curView = (View) param.thisObject;
 				Object[] args = param.args;
 				clickCallback = null;
@@ -580,9 +655,9 @@ public class MMHook implements IXposedHookLoadPackage {
 	}
 	
 	private void hookLateSoClose() {
-		XposedHelpers.findAndHookMethod(TextView.class, "setText", CharSequence.class, BufferType.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod(TextView.class, "setText", CharSequence.class, BufferType.class, new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				if(status == STATUS_NOTHING) {
 					return;
 				}
@@ -618,9 +693,9 @@ public class MMHook implements IXposedHookLoadPackage {
 
 	private void hookCloseDetailRedEnvelope() {
 		// com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI
-		XposedHelpers.findAndHookMethod("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI", classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI", classLoader, "onCreate", Bundle.class, new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(final MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(final MethodHookParam param) throws Throwable {
 				if(status == STATUS_NOTHING) {
 					return;
 				}
@@ -658,13 +733,37 @@ public class MMHook implements IXposedHookLoadPackage {
 	}
 	
 	
-	protected void startFuckRedEnvelop(Msg msg) throws Exception {
+	protected void startFuckRedEnvelop(final Msg msg) throws Exception {
 		if(status != STATUS_NOTHING || msg == null) {
 			return;
 		}
+		
 		curMsgId = msg.msgId;
 		status = STATUS_START_ACTIVITY;
-		startActivity(msg);
+
+		if(msg.talker == null) {
+			return;
+		}
+		// 已经在对应的房间中了，则应该可以直接点击红包
+		if(stay == STAY_IN_ROOM && msg.talker.equals(posTalker)) {
+			status = STATUS_IN_ROOM;
+			postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					// 如果已在房间，应该很快就能变成点击红包的状态的，所以如果还状态还是为STATUS_IN_ROOM，就肯定是不对了
+					if(status == STATUS_IN_ROOM) {
+						try {
+							status = STATUS_START_ACTIVITY;
+							startActivity(msg);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}, 500);
+		} else {
+			startActivity(msg);
+		}
 		final long preMsg = curMsgId;
 		// 超时红包不处理
 		postDelayed(new Runnable() {
@@ -732,9 +831,9 @@ public class MMHook implements IXposedHookLoadPackage {
 	
 
 	private void hookForTest() {
-		XposedBridge.hookAllMethods(PendingIntent.class, "getActivity", new XC_MethodHook() {
+		XposedBridge.hookAllMethods(PendingIntent.class, "getActivity", new MM_MethodHook() {
 			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.args == null || param.args.length < 3) {
 					return;
 				}
@@ -765,16 +864,16 @@ public class MMHook implements IXposedHookLoadPackage {
 		XposedBridge.hookAllMethods(Activity.class, "startActivityForResult", startActivityCallback);
 //		android.support.v4.app.Fragment.a(Context paramContext, String paramString, Bundle paramBundle)
 		
-		XposedHelpers.findAndHookMethod("android.support.v4.app.Fragment", classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod("android.support.v4.app.Fragment", classLoader, "onCreate", Bundle.class, new MM_MethodHook() {
 			@Override
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				XposedBridge.log("Fragment onCreate: " + param.args[0] + " <- " + param.thisObject.getClass().getName());
 			}
 		});
 		
-//		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.e", classLoader, "onCreateView", LayoutInflater.class, ViewGroup.class, Bundle.class, new XC_MethodHook() {
+//		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.e", classLoader, "onCreateView", LayoutInflater.class, ViewGroup.class, Bundle.class, new MM_MethodHook() {
 //			@Override
-//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//			protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 //				XposedBridge.log("Fragment onCreateView: " + param.args[0] + " " + param.args[1] + " " + param.args[2] + " <- " + param.thisObject.getClass().getName());
 //				if(param.args[1] != null) {
 //					XposedBridge.log("Fragment onCreateView: " + param.args[1].getClass().getName());
@@ -782,17 +881,17 @@ public class MMHook implements IXposedHookLoadPackage {
 //			}
 //		});
 		
-		XposedHelpers.findAndHookMethod("android.support.v4.app.Fragment", classLoader, "onAttach", Activity.class, new XC_MethodHook() {
+		XposedHelpers.findAndHookMethod("android.support.v4.app.Fragment", classLoader, "onAttach", Activity.class, new MM_MethodHook() {
 			@Override
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				XposedBridge.log("Fragment onAttach: " + param.args[0].getClass().getName() + " <- " + param.thisObject.getClass().getName());
 			}
 		});
 	}
 
-	XC_MethodHook startActivityCallback = new XC_MethodHook() {
+	MM_MethodHook startActivityCallback = new MM_MethodHook() {
 		@Override
-		protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+		protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 			XposedBridge.log("startActivity: " + param.thisObject.getClass().getName() + "." + param.method.getName());
 			if (param.args == null || param.args.length == 0) {
 				return;
@@ -807,6 +906,43 @@ public class MMHook implements IXposedHookLoadPackage {
 		}
 	};
 	
+	
+	private static class MM_MethodHook extends XC_MethodHook {
+		@Override
+		protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			if(inHook) {
+				return;
+			}
+			inHook = true;
+			MM_beforeHookedMethod(param);
+			inHook = false;
+		}
+		@Override
+		protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+			if(inHook) {
+				return;
+			}
+			inHook = true;
+			MM_afterHookedMethod(param);
+			inHook = false;
+		}
+		@Override
+		protected void call(Param param) throws Throwable {
+			if(inHook) {
+				return;
+			}
+			inHook = true;
+			MM_call(param);
+			inHook = false;
+		}
+		protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
+		}
+		protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+		}
+		protected void MM_call(Param param) throws Throwable {
+		}
+		
+	}
 
 	// PendingIntent.getActivity
 
