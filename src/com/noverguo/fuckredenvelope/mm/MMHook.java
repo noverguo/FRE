@@ -283,11 +283,20 @@ public class MMHook implements IXposedHookLoadPackage {
 			}
 		});
 	}
+	final static MatchView[] groupViewMatchViews;
+	static {
+		groupViewMatchViews = new MatchView[4];
+		groupViewMatchViews[0] = new MatchView(1, new Class<?>[]{RelativeLayout.class, LinearLayout.class});
+		groupViewMatchViews[1] = new MatchView(0, new Class<?>[]{LinearLayout.class, LinearLayout.class});
+		groupViewMatchViews[2] = new MatchView(0, new Class<?>[]{LinearLayout.class, View.class});
+		groupViewMatchViews[3] = new MatchView(0, new Class<?>[]{View.class});
+	}
 	private Map<String, String> allTalks = new HashMap<String, String>();
 	private Map<ListAdapter, ListView> listViewMap = new HashMap<ListAdapter, ListView>();
 	private void hookClickChattingItem() throws Exception {
 		final Class<?> conversationListViewClass = classLoader.loadClass("com.tencent.mm.ui.conversation.ConversationOverscrollListView");
 		final Class<?> conversationAdapterClass = classLoader.loadClass("com.tencent.mm.ui.conversation.d");
+		// 关联adapter，便于之后使用
 		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new XC_MethodHook() {
 			@Override
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
@@ -308,7 +317,17 @@ public class MMHook implements IXposedHookLoadPackage {
 		}
 		final Field usernameField = conversationItemClass.getField("field_username");
 		ReflectUtil.cacheFields(conversationItemClass);
-		
+		final Class<?> textViewClass = classLoader.loadClass("com.tencent.mm.ui.base.NoMeasuredTextView");
+		final Method getTextMethod;
+		if(textViewClass == null) {
+			XposedBridge.log("can not find com.tencent.mm.ui.base.NoMeasuredTextView class");
+			getTextMethod = null;
+		} else {
+			getTextMethod = textViewClass.getMethod("getText", new Class<?>[0]);
+			if(getTextMethod == null) {
+				XposedBridge.log("can not find com.tencent.mm.ui.base.NoMeasuredTextView.getText method");
+			}
+		}
 		
 		// 聊天室或发现栏目
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.d", classLoader, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
@@ -340,8 +359,11 @@ public class MMHook implements IXposedHookLoadPackage {
 				if(userName == null) {
 					return;
 				}
+				
+				String displayName = getDisplayName(view);
+				
 				if(!allTalks.containsKey(userName)) {
-					allTalks.put(userName, "");
+					allTalks.put(userName, displayName);
 					updateTalks();
 				}
 				XposedBridge.log("conversation: " + ReflectUtil.getFieldInfos(item));
@@ -364,6 +386,28 @@ public class MMHook implements IXposedHookLoadPackage {
 				final ListView listView = listViewMap.get(adapter);
 				XposedBridge.log("ListView: " + cur + " --> " + listView);
 				listView.performItemClick(view, pos + 7, adapter.getItemId(pos));
+			}
+			
+			private String getDisplayName(View view) throws Exception {
+				if(textViewClass == null) {
+					return "";
+				}
+				if(getTextMethod == null) {
+					return "";
+				}
+				View displayView = Utils.getChild(groupViewMatchViews, view);
+				if(displayView == null) {
+					return "";
+				}
+				XposedBridge.log("get display view: " + displayView.getClass().getName());
+				if(displayView.getClass() == textViewClass) {
+					Object res = getTextMethod.invoke(displayView, new Object[0]);
+					XposedBridge.log("find display string: " + res);
+					if(res != null) { 
+						return res.toString();
+					}
+				}
+				return "";
 			}
 		});
 		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, new XC_MethodHook() {
@@ -397,7 +441,7 @@ public class MMHook implements IXposedHookLoadPackage {
 				++i;
 			}
 			context.sendBroadcast(new Intent(SettingReceiver.ACTION_TALKS).putExtra(SettingReceiver.KEY_TALKS, values));
-			allTalks.clear();
+//			allTalks.clear();
 		}
 	};
 	private void updateTalks() {
@@ -621,6 +665,17 @@ public class MMHook implements IXposedHookLoadPackage {
 		curMsgId = msg.msgId;
 		status = STATUS_START_ACTIVITY;
 		startActivity(msg);
+		final long preMsg = curMsgId;
+		// 超时红包不处理
+		postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				if(preMsg == curMsgId) {
+					curMsgId = -1;
+					status = STATUS_NOTHING;
+				}
+			}
+		}, 15000);
 	}
 
 	private void startActivity(final Msg msg) throws ClassNotFoundException, CanceledException {

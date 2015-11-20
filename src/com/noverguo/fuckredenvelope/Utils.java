@@ -9,6 +9,34 @@ import android.widget.TextView;
 import de.robv.android.xposed.XposedBridge;
 
 public class Utils {
+	public static View getChild(MatchView[] matchViews, View view) {
+		if(matchViews == null || matchViews.length == 0) {
+			return null;
+		}
+		View curView = view;
+		ViewGroup curGroup = null;
+		for(int i=0;i<matchViews.length;++i) {
+			if(matchViews[i].viewClasses == null || matchViews[i].viewClasses.length == 0) {
+				return null;
+			}
+			if(!(curView instanceof ViewGroup)) {
+				return null;
+			}
+			curGroup = (ViewGroup) curView;
+			if(curGroup.getChildCount() != matchViews[i].viewClasses.length) {
+				return null;
+			}
+			for(int j=0;j<matchViews[i].viewClasses.length;++j) {
+				if(!instanceOf(curGroup.getChildAt(j), matchViews[i].viewClasses[j])) {
+					return null;
+				}
+			}
+			curView = curGroup.getChildAt(matchViews[i].idx);
+		}
+		
+		return curView;
+	}
+	
 	public static boolean instanceOf(Object obj, Class<?> clazz) {
 		return instanceOf(obj, clazz, false);
 	}
@@ -36,6 +64,11 @@ public class Utils {
 				XposedBridge.log(obj.getClass().getName() + " --> ImageView: " + (obj instanceof ImageView));
 			}
 			return obj instanceof ImageView;
+		} else if(clazz == View.class) {
+			if(debug) {
+				XposedBridge.log(obj.getClass().getName() + " --> View: " + (obj instanceof View));
+			}
+			return obj instanceof View;
 		}
 		return obj.getClass() == clazz;
 	}

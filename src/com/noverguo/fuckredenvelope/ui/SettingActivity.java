@@ -124,7 +124,7 @@ public class SettingActivity extends Activity {
 			grepSet.add(talkSel.talkName);
 			talkSels.add(talkSel);
 			CheckBox talkCheckItem = new CheckBox(this);
-			talkCheckItem.setText(talkSel.talkName);
+			talkCheckItem.setText(TextUtils.isEmpty(talkSel.showName) ? talkSel.talkName : talkSel.showName);
 			talkCheckItem.setChecked(talkSel.check);
 			talkCheckItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
 				@Override
