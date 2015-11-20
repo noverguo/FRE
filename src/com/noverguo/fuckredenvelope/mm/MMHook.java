@@ -299,24 +299,24 @@ public class MMHook implements IXposedHookLoadPackage {
 				doneMsgIds.add(msgId);
 			}
 		});
-		final Method avCMethod = classLoader.loadClass("com.tencent.mm.ui.i").getMethod("avC", new Class<?>[0]);
-		if(avCMethod == null) {
-			XposedBridge.log("not found com.tencent.mm.ui.i.avC method");
-		}
+//		final Method avCMethod = classLoader.loadClass("com.tencent.mm.ui.i").getMethod("avC", new Class<?>[0]);
+//		if(avCMethod == null) {
+//			XposedBridge.log("not found com.tencent.mm.ui.i.avC method");
+//		}
 		
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", classLoader, "getCount", new MM_MethodHook() {
 			@Override
 			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-				if(avCMethod == null || status == STATUS_NOTHING) {
+				if(status == STATUS_NOTHING) {
 					return;
 				}
 				Integer count = (Integer) param.getResult();
 				BaseAdapter adapter = (BaseAdapter) param.thisObject;
-				Integer acv = (Integer) avCMethod.invoke(adapter, new Object[0]);
-				int curIdx = acv;
-				XposedBridge.log("com.tencent.mm.ui.i.getCount: " + acv + ", " + count);
+//				Integer acv = (Integer) avCMethod.invoke(adapter, new Object[0]);
+				int curIdx = 0;
+				XposedBridge.log("com.tencent.mm.ui.i.getCount: " + count);
 				itemMap.clear();
-				for(int i=acv;i<count;++i) {
+				for(int i=0;i<count;++i) {
 					Object item = adapter.getItem(i);
 					if(item == null) {
 						continue;
@@ -326,7 +326,7 @@ public class MMHook implements IXposedHookLoadPackage {
 					}
 					Long msgId = (Long) msgIdField.get(item);
 					if(redEnvelopMsgs.get(msgId) != null) {
-						itemMap.put(curIdx, i);
+						itemMap.put(curIdx++, i);
 					}
 				}
 			}
@@ -335,7 +335,7 @@ public class MMHook implements IXposedHookLoadPackage {
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", classLoader, "getItem", int.class, new MM_MethodHook() {
 			@Override
 			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-				if(avCMethod == null || status == STATUS_NOTHING) {
+				if(status == STATUS_NOTHING) {
 					return;
 				}
 				Object item = param.getResult();
