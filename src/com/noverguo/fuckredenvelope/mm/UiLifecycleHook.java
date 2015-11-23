@@ -53,7 +53,7 @@ public class UiLifecycleHook {
 				hi.setStayInRoom();
 				if (flag.get()) {
 					if (hi.chattingListViewAdapter != null && hi.isStayInRoom()) {
-						hi.postDelayed(notifyDataSetChanged, 8000);
+//						hi.postDelayed(notifyDataSetChanged, 8000);
 					}
 				}
 			}

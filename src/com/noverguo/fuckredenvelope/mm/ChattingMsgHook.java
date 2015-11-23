@@ -57,8 +57,8 @@ public class ChattingMsgHook {
 		// 发现红包就点击
 		cmh.hookGetView();
 		// 过滤非红包的消息
-		cmh.hookGetCount();
-		cmh.hookGetItem();
+//		cmh.hookGetCount();
+//		cmh.hookGetItem();
 	}
 
 	private SparseArray<Object> items;
