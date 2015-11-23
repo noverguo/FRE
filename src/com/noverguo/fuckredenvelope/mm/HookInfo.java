@@ -125,7 +125,7 @@ public class HookInfo {
 					end();
 				}
 			}
-		}, 20000);
+		}, 5000);
 	}
 
 	private void tryToWaitRE(final Msg msg, final int count) {

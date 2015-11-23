@@ -154,7 +154,7 @@ public class ChattingMsgHook {
 				hi.postDelayed(new Runnable() {
 					@Override
 					public void run() {
-						XposedBridge.log("clickNewMsg: " + tv.getText().toString());
+						XposedBridge.log("clickNewMsg: " + tv.getText().toString() + ", " + callback.getClass().getName() + ", " + curView.getClass().getName());
 						callback.onClick(curView);
 					}
 				}, 10000);
