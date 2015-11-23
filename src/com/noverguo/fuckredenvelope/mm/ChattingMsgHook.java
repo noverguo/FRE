@@ -157,7 +157,7 @@ public class ChattingMsgHook {
 						XposedBridge.log("clickNewMsg: " + tv.getText().toString());
 						callback.onClick(curView);
 					}
-				}, 8000);
+				}, 10000);
 			}
 
 		});
@@ -199,7 +199,6 @@ public class ChattingMsgHook {
 					return;
 				}
 				hi.chattingListViewAdapter = adapter;
-				XposedBridge.log("getView adapter: " + adapter + ", " + (adapter == null ? "" : adapter.getClass().getName()));
 				// 只处理红包
 				if (!hi.clickCallbackMap.containsKey(view)) {
 					return;
@@ -280,7 +279,7 @@ public class ChattingMsgHook {
 					}
 				}
 				if (items.size() > 0) {
-					XposedBridge.log("com.tencent.mm.ui.i.getCount change: " + items.size());
+//					XposedBridge.log("com.tencent.mm.ui.i.getCount change: " + items.size());
 					param.setResult(items.size());
 				}
 			}
@@ -305,7 +304,7 @@ public class ChattingMsgHook {
 				if (curItem == null) {
 					return;
 				}
-				XposedBridge.log("com.tencent.mm.ui.i.getItem: status: " + hi.status + " :" + (Integer) param.args[0] + " --> " + msgIdField.get(curItem));
+//				XposedBridge.log("com.tencent.mm.ui.i.getItem: status: " + hi.status + " :" + (Integer) param.args[0] + " --> " + msgIdField.get(curItem));
 				// 转移到红包的位置
 				// BaseAdapter adapter = (BaseAdapter) param.thisObject;
 				// param.setResult(adapter.getItem(val));

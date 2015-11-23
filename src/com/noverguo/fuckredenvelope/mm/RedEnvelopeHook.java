@@ -30,6 +30,9 @@ public class RedEnvelopeHook {
 			View.OnClickListener clickCallback = null;
 			@Override
 			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				if (!(param.thisObject instanceof Button)) {
+					return;
+				}
 				View curView = (View) param.thisObject;
 				Object[] args = param.args;
 				clickCallback = null;
@@ -42,9 +45,7 @@ public class RedEnvelopeHook {
 					return;
 				}
 
-				if (curView instanceof Button) {
-					hookClickFuckRedEnvelope(param, (Button) curView);
-				}
+				hookClickFuckRedEnvelope(param, (Button) curView);
 			}
 			
 			// 点击拆红包

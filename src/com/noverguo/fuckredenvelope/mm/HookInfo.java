@@ -191,11 +191,7 @@ public class HookInfo {
 	
 	public void startIfNeed() throws Exception {
 		XposedBridge.log("还有未抢红包： " + redEnvelopMsgs.size());
-		if(chattingListViewAdapter != null && isStayInRoom()) {
-			if(chattingListViewAdapter != null) {
-				chattingListViewAdapter.notifyDataSetChanged();
-			}
-		}
+		UiLifecycleHook.flag.set(true);
 		if(redEnvelopMsgs.size() == 0) {
 			return;
 		}
