@@ -24,9 +24,9 @@ public class ReflectUtil {
 		if(fields != null) {
 			fieldSet.addAll(Arrays.asList(fields));
 		}
-		for(Field field : fieldSet) {
-			XposedBridge.log("cacheFields: " + clazz.getName() + "." + field.getName());
-		}
+//		for(Field field : fieldSet) {
+//			XposedBridge.log("cacheFields: " + clazz.getName() + "." + field.getName());
+//		}
 		fieldMap.put(clazz, fieldSet);
 	}
 	

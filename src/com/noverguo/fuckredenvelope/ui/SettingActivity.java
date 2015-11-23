@@ -25,7 +25,7 @@ import com.noverguo.fuckredenvelope.FREApplication;
 import com.noverguo.fuckredenvelope.R;
 import com.noverguo.fuckredenvelope.Settings;
 import com.noverguo.fuckredenvelope.TalkSel;
-import com.noverguo.fuckredenvelope.mm.MMHook;
+import com.noverguo.fuckredenvelope.mm.HookInfo;
 
 public class SettingActivity extends Activity {
 	private CheckBox cbHookSel;
@@ -46,7 +46,7 @@ public class SettingActivity extends Activity {
 				if (isChecked) {
 					cbHookSel.setText(R.string.hook_sel_all);
 					llHookItems.setVisibility(View.GONE);
-					sendBroadcast(new Intent(MMHook.ACTION_TALKS));
+					sendBroadcast(new Intent(HookInfo.ACTION_TALKS));
 				} else {
 					cbHookSel.setText(R.string.hook_sel_some);
 					initHookItems();
@@ -142,7 +142,7 @@ public class SettingActivity extends Activity {
 					if(grepTalks.isEmpty()) {
 						grepTalks.add("null_name");
 					}
-					sendBroadcast(new Intent(MMHook.ACTION_TALKS).putExtra(MMHook.KEY_TALKS, grepTalks.toArray(new String[grepTalks.size()])));
+					sendBroadcast(new Intent(HookInfo.ACTION_TALKS).putExtra(HookInfo.KEY_TALKS, grepTalks.toArray(new String[grepTalks.size()])));
 					Settings.setTalks(saveValues);
 				}
 			});

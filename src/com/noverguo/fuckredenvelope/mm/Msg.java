@@ -14,4 +14,9 @@ public class Msg {
 		content = values.getAsString("content");
 		type = values.getAsInteger("type");
 	}
+	
+	@Override
+	public String toString() {
+		return "msgId: " + msgId + ", talker: " + talker + ", type: " + type + ", content: " + content;
+	}
 }
