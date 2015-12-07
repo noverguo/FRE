@@ -10,6 +10,12 @@ public class FREApplication extends Application {
 		super.onCreate();
 		context = this;
 	}
+	
+	@Override
+	public void onTerminate() {
+		super.onTerminate();
+	}
+	
 	public static Context getContext() {
 		return context;
 	}

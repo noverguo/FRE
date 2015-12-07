@@ -2,6 +2,7 @@ package com.noverguo.fuckredenvelope.mm;
 
 import java.lang.reflect.Field;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.util.SparseArray;
 import android.view.View;
@@ -137,6 +138,7 @@ public class ChattingMsgHook {
 			}
 			
 			private String preNewMsg;
+			private AtomicBoolean flag = new AtomicBoolean(false);
 			private void relativeClickNewMsg(MethodHookParam param, final View curView) {
 				if(!hi.canFuck()) {
 					return;
@@ -150,14 +152,26 @@ public class ChattingMsgHook {
 					return;
 				}
 				final View.OnClickListener callback = clickCallback;
+				flag.set(false);
+				if(preNewMsg == null) {
+					XposedHelpers.findAndHookMethod(callback.getClass(), "onClick", View.class, new MM_MethodHook() {
+						@Override
+						protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
+							flag.set(true);
+						}
+					});
+				}
 				preNewMsg = curNewMsg;
 				hi.postDelayed(new Runnable() {
 					@Override
 					public void run() {
+						if(flag.get()) {
+							return;
+						}
 						XposedBridge.log("clickNewMsg: " + tv.getText().toString() + ", " + callback.getClass().getName() + ", " + curView.getClass().getName());
 						callback.onClick(curView);
 					}
-				}, 10000);
+				}, 8000);
 			}
 
 		});

@@ -22,6 +22,7 @@ import android.view.View;
 import android.widget.BaseAdapter;
 
 import com.noverguo.fuckredenvelope.ClickView;
+import com.noverguo.fuckredenvelope.receiver.UnlockReceiver;
 
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
@@ -88,6 +89,10 @@ public class HookInfo {
 				context = (Context) param.thisObject;
 				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
 				context.registerReceiver(talksReceiver, intentFilter);
+				
+				IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+		        filter.addAction(Intent.ACTION_SCREEN_OFF);
+		        context.registerReceiver(new UnlockReceiver(), filter);
 			}
 		});
 	}
@@ -156,18 +161,23 @@ public class HookInfo {
 	
 	// 启动含红包的界面
 	private void startActivity(final Msg msg) throws ClassNotFoundException, CanceledException {
-		final Intent intent = new Intent(context, classLoader.loadClass("com.tencent.mm.ui.LauncherUI"));
-		intent.putExtra("talkerCount", 1);
-		intent.putExtra("nofification_type", "new_msg_nofification");
-		intent.putExtra("Intro_Bottle_unread_count", 0);
-		intent.putExtra("MainUI_User_Last_Msg_Type", msg.type);
-		intent.putExtra("Intro_Is_Muti_Talker", false);
-		intent.putExtra("Main_User",msg.talker);
-		intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-		intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-		// intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-		XposedBridge.log("启动有红包的界面: " + msg.type + "  " + msg.talker + " status: " + status);
-		PendingIntent.getActivity(context, 4097, intent, PendingIntent.FLAG_UPDATE_CURRENT).send();
+		if(UnlockReceiver.screenLock) {
+			// 解锁屏幕
+			context.sendBroadcast(new Intent(UnlockReceiver.ACTION_UNLOCK));
+		} else {
+			final Intent intent = new Intent(context, classLoader.loadClass("com.tencent.mm.ui.LauncherUI"));
+			intent.putExtra("talkerCount", 1);
+			intent.putExtra("nofification_type", "new_msg_nofification");
+			intent.putExtra("Intro_Bottle_unread_count", 0);
+			intent.putExtra("MainUI_User_Last_Msg_Type", msg.type);
+			intent.putExtra("Intro_Is_Muti_Talker", false);
+			intent.putExtra("Main_User",msg.talker);
+			intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+			// intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			XposedBridge.log("启动有红包的界面: " + msg.type + "  " + msg.talker + " status: " + status);
+			PendingIntent.getActivity(context, 4097, intent, PendingIntent.FLAG_UPDATE_CURRENT).send();
+		}
 	}
 	
 	

@@ -1,37 +1,50 @@
 package com.noverguo.fuckredenvelope.mm;
 
 import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XposedBridge;
 
 public class MM_MethodHook extends XC_MethodHook {
 	public static boolean inHook = false;
 
 	@Override
-	protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+	final protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 		if (inHook) {
 			return;
 		}
 		inHook = true;
-		MM_beforeHookedMethod(param);
+		try {
+			MM_beforeHookedMethod(param);
+		} catch(Throwable e) {
+			XposedBridge.log(e);
+		}
 		inHook = false;
 	}
 
 	@Override
-	protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+	final protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 		if (inHook) {
 			return;
 		}
 		inHook = true;
-		MM_afterHookedMethod(param);
+		try {
+			MM_afterHookedMethod(param);
+		} catch(Throwable e) {
+			XposedBridge.log(e);
+		}
 		inHook = false;
 	}
 
 	@Override
-	protected void call(Param param) throws Throwable {
+	final protected void call(Param param) throws Throwable {
 		if (inHook) {
 			return;
 		}
 		inHook = true;
-		MM_call(param);
+		try {
+			MM_call(param);
+		} catch(Throwable e) {
+			XposedBridge.log(e);
+		}
 		inHook = false;
 	}
 
@@ -43,5 +56,4 @@ public class MM_MethodHook extends XC_MethodHook {
 
 	protected void MM_call(Param param) throws Throwable {
 	}
-
 }

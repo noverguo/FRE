@@ -2,7 +2,6 @@ package com.noverguo.fuckredenvelope.mm;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XposedBridge;
-import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
 public class MMHook implements IXposedHookLoadPackage {
@@ -16,7 +15,7 @@ public class MMHook implements IXposedHookLoadPackage {
 
 		hi.init(lpparam);
 		// 不给读imei和imsi，以免封号
-		PropertiesHook.hookReadImeiAndImsi(hi);
+		PropertiesHook.hookPreventCheck(hi);
 		// 读取消息，发现红包则启动窗口
 		IncomeMsgHook.hookReadMsg(hi);
 		// 启动窗口后，可能会停在消息列表窗口（具体原因待查），这时需要去点击进入对应的窗口

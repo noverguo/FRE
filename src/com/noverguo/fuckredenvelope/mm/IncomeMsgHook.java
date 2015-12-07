@@ -55,8 +55,6 @@ public class IncomeMsgHook {
 				if (content.contains("领取红包") && content.contains("微信红包") && content.contains("查看红包")) {
 					hi.redEnvelopMsgs.put(msg.msgId, msg);
 					hi.startFuckRedEnvelop(msg);
-					// 解锁屏幕
-					hi.context.sendBroadcast(new Intent(UnlockReceiver.ACTION_UNLOCK));
 				}
 			}
 
