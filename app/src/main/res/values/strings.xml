@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">我要抢</string>
+	<string name="hook_sel_all">幸福全靠你</string>
+	<string name="hook_sel_some">请手下留情</string>
+	<string name="fuck_red_envelope">抢抢抢</string>
+</resources>
