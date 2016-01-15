@@ -14,7 +14,7 @@ public class IncomeMsgHook {
 		XposedHelpers.findAndHookMethod(ContentValues.class, "size", new MM_MethodHook() {
 			boolean hookCloseDetail = false;
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				try {
 					if (!hookCloseDetail) {
 						RedEnvelopeHook.hookCloseDetailRedEnvelope(hi);

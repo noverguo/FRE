@@ -71,7 +71,7 @@ public class CommunicationsHook {
 		// 关联adapter，便于之后使用
 		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new MM_MethodHook() {
 			@Override
-			protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
 					if (param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
 						return;
@@ -91,7 +91,7 @@ public class CommunicationsHook {
 	private void hookGetView() {
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.e", hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				// 有可能getView没被重新触发，这时可以用旧的view去点
 				hi.postDelayed(new Runnable() {
 					@Override
@@ -150,7 +150,7 @@ public class CommunicationsHook {
 			private long pre = 0;
 
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 //				XposedBridge.log("com.tencent.mm.ui.conversation.d.getView");
 				final View view = (View) param.getResult();
 				if (view == null) {
@@ -269,7 +269,7 @@ public class CommunicationsHook {
 	private void hookItemClick() {
 		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, new MM_MethodHook() {
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.thisObject.getClass() != conversationListViewClass) {
 					return;
 				}
@@ -281,7 +281,7 @@ public class CommunicationsHook {
 					Method method = ReflectUtil.getMethod(itemListenerClass, "onItemClick");
 					if (method != null) {
 						XposedBridge.hookAllMethods(itemListenerClass, method.getName(), new MM_MethodHook() {
-							protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+							public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 								Integer pos = (Integer) param.args[2];
 								if (pos == null || pos < 0 || pos > conversationListView.getCount()) {
 									return;

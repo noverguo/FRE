@@ -85,7 +85,7 @@ public class HookInfo {
 		// hook Application.onCreate
 		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new MM_MethodHook() {
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				context = (Context) param.thisObject;
 				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
 				context.registerReceiver(talksReceiver, intentFilter);
@@ -99,7 +99,7 @@ public class HookInfo {
 
 	// 开始去抢红包
 	public void startFuckRedEnvelop(final Msg msg) throws Exception {
-		if (status != STATUS_NOTHING || msg == null) {
+		if (isStarted() || msg == null) {
 			return;
 		}
 
@@ -157,6 +157,14 @@ public class HookInfo {
 		}, 20);
 	}
 
+	public void post(Runnable runnable) {
+		if (uiHandler == null) {
+			uiHandler = new Handler(Looper.getMainLooper());
+		}
+		uiHandler.removeCallbacks(runnable);
+		uiHandler.post(runnable);
+	}
+
 	public void postDelayed(Runnable runnable, int delayMillis) {
 		if (uiHandler == null) {
 			uiHandler = new Handler(Looper.getMainLooper());
@@ -202,7 +210,6 @@ public class HookInfo {
 			ClickView curClickView = redEnvelopClickView.get(curMsgId);
 			redEnvelopClickView.remove(curMsgId);
 
-//			XposedBridge.log("click red envelope: " + curMsgId);
 			status = HookInfo.STATUS_CLICK_RED_ENVELOPE_VIEW;
 			// 点击领取红包
 			curClickView.clickCallback.onClick(curClickView.view);
@@ -216,7 +223,7 @@ public class HookInfo {
 		curMsgId = -1;
 		if(isStayInRoom() && redEnvelopClickView.size() > 0) {
 			// 有未点击的红包，则先点击
-			postDelayed(clickRedEnvelopCallback, 500);
+			post(clickRedEnvelopCallback);
 			resetCheck();
 			return;
 		} else {
@@ -232,7 +239,6 @@ public class HookInfo {
 	}
 	
 	public void startIfNeed() throws Exception {
-//		XposedBridge.log("还有未抢红包： " + redEnvelopMsgs.size());
 		UiLifecycleHook.flag.set(true);
 		if(redEnvelopMsgs.size() == 0) {
 			return;

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import android.app.Activity;
 import android.app.PendingIntent;
@@ -11,6 +12,7 @@ import android.app.PendingIntent.CanceledException;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.View;
@@ -31,11 +33,16 @@ import com.nv.fre.mm.MMHook;
 public class SettingActivity extends Activity {
 	private CheckBox cbHookSel;
 	private LinearLayout llHookItems;
+	HandlerThread bgThread;
+	Handler bgHandler;
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setUnlocked();
 		setContentView(R.layout.setting_ui);
+		bgThread = new HandlerThread("bg");
+		bgThread.start();
+		bgHandler = new Handler(bgThread.getLooper());
 		currentActivity = this;
 		cbHookSel = (CheckBox) findViewById(R.id.hook_sel);
 		llHookItems = (LinearLayout) findViewById(R.id.hook_sel_items);
@@ -101,6 +108,7 @@ public class SettingActivity extends Activity {
 
 	private List<TalkSel> talkSels = new ArrayList<TalkSel>();
 
+
 	private void initHookItems() {
 		llHookItems.removeAllViews();
 		String[] talks = Settings.getTalks();
@@ -124,22 +132,27 @@ public class SettingActivity extends Activity {
 			talkCheckItem.setChecked(talkSel.check);
 			talkCheckItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
 				@Override
-				public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-					talkSel.check = isChecked;
-					String[] saveValues = new String[talkSels.size()];
-					List<String> grepTalks = new ArrayList<String>();
-					for (int i = 0; i < saveValues.length; ++i) {
-						TalkSel curTalkSel = talkSels.get(i);
-						saveValues[i] = curTalkSel.toString();
-						if(curTalkSel.check) {
-							grepTalks.add(curTalkSel.talkName);
+				public void onCheckedChanged(CompoundButton buttonView, final boolean isChecked) {
+					bgHandler.post(new Runnable(){
+						@Override
+						public void run() {
+							talkSel.check = isChecked;
+							String[] saveValues = new String[talkSels.size()];
+							List<String> grepTalks = new ArrayList<String>();
+							for (int i = 0; i < saveValues.length; ++i) {
+								TalkSel curTalkSel = talkSels.get(i);
+								saveValues[i] = curTalkSel.toString();
+								if(curTalkSel.check) {
+									grepTalks.add(curTalkSel.talkName);
+								}
+							}
+							if(grepTalks.isEmpty()) {
+								grepTalks.add("null_name");
+							}
+							sendBroadcast(new Intent(HookInfo.ACTION_TALKS).putExtra(HookInfo.KEY_TALKS, grepTalks.toArray(new String[grepTalks.size()])));
+							Settings.setTalks(saveValues);
 						}
-					}
-					if(grepTalks.isEmpty()) {
-						grepTalks.add("null_name");
-					}
-					sendBroadcast(new Intent(HookInfo.ACTION_TALKS).putExtra(HookInfo.KEY_TALKS, grepTalks.toArray(new String[grepTalks.size()])));
-					Settings.setTalks(saveValues);
+					});
 				}
 			});
 			llHookItems.addView(talkCheckItem);

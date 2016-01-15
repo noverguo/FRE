@@ -13,7 +13,7 @@ public class AutoSendHook {
 		final Class<?> mmEditTextClass = hi.classLoader.loadClass("com.tencent.mm.ui.widget.MMEditText");
 		XposedHelpers.findAndHookMethod(TextView.class, "handleTextChanged", CharSequence.class, int.class, int.class, int.class, new MM_MethodHook() {
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				TextView tv = (TextView) param.thisObject;
 				if (tv.getClass() != mmEditTextClass) {
 					return;
@@ -25,7 +25,7 @@ public class AutoSendHook {
 
 		XposedBridge.hookAllConstructors(ImageButton.class, new MM_MethodHook() {
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				ImageButton ib = (ImageButton) param.thisObject;
 				CharSequence contentDescription = ib.getContentDescription();
 				if (contentDescription == null) {

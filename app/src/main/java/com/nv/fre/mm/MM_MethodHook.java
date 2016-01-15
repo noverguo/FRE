@@ -7,7 +7,7 @@ public class MM_MethodHook extends XC_MethodHook {
 	public static boolean inHook = false;
 
 	@Override
-	final protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+	final public void beforeHookedMethod(MethodHookParam param) throws Throwable {
 		if (inHook) {
 			return;
 		}
@@ -21,7 +21,7 @@ public class MM_MethodHook extends XC_MethodHook {
 	}
 
 	@Override
-	final protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+	final public void afterHookedMethod(MethodHookParam param) throws Throwable {
 		if (inHook) {
 			return;
 		}
@@ -35,7 +35,7 @@ public class MM_MethodHook extends XC_MethodHook {
 	}
 
 	@Override
-	final protected void call(Param param) throws Throwable {
+	final public void call(Param param) throws Throwable {
 		if (inHook) {
 			return;
 		}
@@ -48,12 +48,12 @@ public class MM_MethodHook extends XC_MethodHook {
 		inHook = false;
 	}
 
-	protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
+	public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 	}
 
-	protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+	public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 	}
 
-	protected void MM_call(Param param) throws Throwable {
+	public void MM_call(Param param) throws Throwable {
 	}
 }

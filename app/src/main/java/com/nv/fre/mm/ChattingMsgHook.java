@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,11 +34,14 @@ public class ChattingMsgHook {
 		redEnvelopeChildViewClasses[1] = new MatchView(1, new Class<?>[] { ImageView.class, RelativeLayout.class });
 		redEnvelopeChildViewClasses[2] = new MatchView(0, new Class<?>[] { LinearLayout.class });
 		redEnvelopeChildViewClasses[3] = new MatchView(1, new Class<?>[] { TextView.class, TextView.class });
-		
-		redEnvelopeParentViewClasses = new Class<?>[3];
+
+		// old: LinearLayout LinearLayout RelativeLayout
+		// new: LinearLayout LinearLayout LinearLayout LinearLayout com.tencent.mm.ui.chatting.av
+		redEnvelopeParentViewClasses = new Class<?>[5];
 		redEnvelopeParentViewClasses[0] = LinearLayout.class;
 		redEnvelopeParentViewClasses[1] = LinearLayout.class;
-		redEnvelopeParentViewClasses[2] = RelativeLayout.class;
+		redEnvelopeParentViewClasses[2] = LinearLayout.class;
+		redEnvelopeParentViewClasses[3] = LinearLayout.class;
 		
 		newMsgViewClasses = new MatchView[1];
 		newMsgViewClasses[0] = new MatchView(1, new Class<?>[]{ImageView.class, TextView.class});
@@ -70,7 +74,9 @@ public class ChattingMsgHook {
 	private ChattingMsgHook(HookInfo hi) throws Exception {
 		this.hi = hi;
 		items = new SparseArray<Object>();
-		msgClass = hi.classLoader.loadClass("com.tencent.mm.storage.ad");
+		// old: com.tencent.mm.storage.ad
+		// new: com.tencent.mm.storage.ae
+		msgClass = hi.classLoader.loadClass("com.tencent.mm.storage.ae");
 		msgIdField = msgClass.getField("field_msgId");
 		msgIdField.setAccessible(true);
 	}
@@ -80,10 +86,10 @@ public class ChattingMsgHook {
 		// 关联adapter，便于之后使用
 		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new MM_MethodHook() {
 			@Override
-			protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
+					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
 					if(param.args[0].getClass() == adapterClass) {
-//						XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
 						listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
 					}
 				}
@@ -100,7 +106,7 @@ public class ChattingMsgHook {
 		XposedHelpers.findAndHookMethod(View.class, "setOnClickListener", View.OnClickListener.class, new MM_MethodHook() {
 			View.OnClickListener clickCallback = null;
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				View curView = (View) param.thisObject;
 				Object[] args = param.args;
 				if (args[0] != null && args[0] instanceof View.OnClickListener) {
@@ -126,13 +132,17 @@ public class ChattingMsgHook {
 				}
 //				XposedBridge.log("发现红包: " + curView.getClass().getName());
 				ViewParent parent = (ViewParent) curView;
-				for(Class<?> parentClass : redEnvelopeParentViewClasses) {
+				while(parent.getParent() != null) {
 					parent = parent.getParent();
-					if(!Utils.instanceOf(parent, parentClass)) {
-						return false;
-					}
 				}
 				hi.clickCallbackMap.put((View)parent, new ClickView(curView, clickCallback));
+				final View keyView = (View) parent;
+				hi.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						hi.clickCallbackMap.remove(keyView);
+					}
+				}, 15000);
 				return true;
 			}
 			
@@ -155,7 +165,7 @@ public class ChattingMsgHook {
 				if(preNewMsg == null) {
 					XposedHelpers.findAndHookMethod(callback.getClass(), "onClick", View.class, new MM_MethodHook() {
 						@Override
-						protected void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
+						public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 							flag.set(true);
 						}
 					});
@@ -178,9 +188,11 @@ public class ChattingMsgHook {
 	
 	private void hookGetView() {
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.chatting.cj", hi.classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
+			private AtomicBoolean isRun = new AtomicBoolean(false);
 			Runnable clickRedEnvelopCallback = new Runnable() {
 				@Override
 				public void run() {
+					isRun.set(true);
 					ClickView curClickView = hi.redEnvelopClickView.get(hi.curMsgId);
 					if(curClickView == null) {
 						// 当前的没有，就改成存在的
@@ -188,14 +200,14 @@ public class ChattingMsgHook {
 						curClickView = hi.redEnvelopClickView.get(hi.curMsgId);
 					}
 					hi.redEnvelopClickView.remove(hi.curMsgId);
-//					XposedBridge.log("click red envelope2: " + hi.curMsgId);
 					hi.status = HookInfo.STATUS_CLICK_RED_ENVELOPE_VIEW;
+					XposedBridge.log("点击领取红包: " + hi.curMsgId);
 					// 点击领取红包
 					curClickView.clickCallback.onClick(curClickView.view);
 					hi.doneMsgIds.add(hi.curMsgId);
 				}
 			};
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				final View view = (View) param.getResult();
 				if (view == null) {
 					return;
@@ -209,6 +221,7 @@ public class ChattingMsgHook {
 				inHook = false;
 				Object item = adapter.getItem(pos);
 				inHook = true;
+//				XposedBridge.log("getView getItem: " + item.getClass().getName());
 				if (item == null || item.getClass() != msgClass) {
 					return;
 				}
@@ -218,30 +231,32 @@ public class ChattingMsgHook {
 					return;
 				}
 				final Long msgId = (Long) msgIdField.get(item);
-//				XposedBridge.log("getView msgId: " + hi.curMsgId + " -> " + msgId);
 				// 红包已领取，不再进行领取
 				if (hi.doneMsgIds.contains(msgId)) {
+					hi.clickCallbackMap.remove(view);
 					return;
 				}
 				if (hi.curMsgId == -1) {
 					if (hi.redEnvelopMsgs.size() > 0) {
 						// 先把新的红包抢到，再考虑当前界面中未抢到的
+						hi.clickCallbackMap.remove(view);
 						return;
 					} else {
 						// 有旧红包未领取
 						hi.curMsgId = msgId;
 					}
 				} else if (hi.curMsgId != msgId) {
-//					if(hi.redEnvelopMsgs.get(msgId) != null) {
-//						hi.curMsgId = msgId;
-//					}
+				}
+				if(hi.redEnvelopClickView.size() == 0) {
+					isRun.set(false);
+					// getView和clickRedEnvelopCallback都运行在主线程，getView会执行多次，
 				}
 				hi.redEnvelopClickView.put(msgId, hi.clickCallbackMap.get(view));
-				
-//				hi.status = HookInfo.STATUS_CLICK_RED_ENVELOPE_VIEW;
-//				XposedBridge.log("getView msgId: " + msgId + " : 点击领取红包");
-				hi.uiHandler.removeCallbacks(clickRedEnvelopCallback);
-				hi.uiHandler.post(clickRedEnvelopCallback);
+//				XposedBridge.log("getView 发现可领取的红包: " + msgId);
+				if(!isRun.get()) {
+					hi.uiHandler.removeCallbacks(clickRedEnvelopCallback);
+					hi.uiHandler.post(clickRedEnvelopCallback);
+				}
 			}
 		});
 	}
@@ -251,7 +266,7 @@ public class ChattingMsgHook {
 		// 如果是有新红包消息时，即此时会插入新的view，这时需要，
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", hi.classLoader, "getCount", new MM_MethodHook() {
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 //				XposedBridge.log("com.tencent.mm.ui.i.getCount: " + param.getResult());
 				if (!hi.canFuck()) {
 					return;
@@ -303,7 +318,7 @@ public class ChattingMsgHook {
 	private void hookGetItem() {
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", hi.classLoader, "getItem", int.class, new MM_MethodHook() {
 			@Override
-			protected void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 //				XposedBridge.log("com.tencent.mm.ui.i.getItem: " + param.args[0]);
 				if (!hi.canFuck() || !hi.initCount) {
 					return;
