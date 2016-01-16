@@ -330,12 +330,15 @@ public class CommunicationsHook {
 				uploadTalks();
 			}
 		});
-		hi.bgHandler.postDelayed(updateToView, 1000);
+		hi.postDelayed(updateToView, 1000);
 	}
 	private Set<String> hasUploadTalkers = new HashSet<>();
 	private ConnectedHelper connectedHelper = new ConnectedHelper();
 	private void uploadTalks() {
+		XposedBridge.log("uploadTalks" + allTalks);
 		if(!GrpcServer.init()) {
+			XposedBridge.log("GrpcServer init failed" + allTalks);
+			registerCheck();
 			return;
 		}
 		final Map<String, String> uploadTalkers = new HashMap<>();
@@ -351,6 +354,7 @@ public class CommunicationsHook {
 		Fre.UploadRequest request = new Fre.UploadRequest();
 		request.uuid = UUIDUtils.getUUID(hi.context);
 		request.talkers = uploadTalkers;
+		XposedBridge.log("upload: " + uploadTalkers);
 		GrpcServer.upload(request, new StreamObserver<Fre.EmptyReply>() {
 			@Override
 			public void onNext(Fre.EmptyReply value) {
@@ -360,16 +364,20 @@ public class CommunicationsHook {
 
 			@Override
 			public void onError(Throwable t) {
-				connectedHelper.registerConnectedCheck(hi.context, new ConnectedHelper.Callback() {
-					@Override
-					public void onConnected() {
-						uploadTalks();
-					}
-				});
+				registerCheck();
 			}
 
 			@Override
 			public void onCompleted() {
+			}
+		});
+	}
+
+	private void registerCheck() {
+		connectedHelper.registerConnectedCheck(hi.context, new ConnectedHelper.Callback() {
+			@Override
+			public void onConnected() {
+				uploadTalks();
 			}
 		});
 	}

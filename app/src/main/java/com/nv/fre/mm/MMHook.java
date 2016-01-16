@@ -20,9 +20,9 @@ public class MMHook implements IXposedHookLoadPackage {
 		}
 
 		hi.init(lpparam);
-		hi.allow = false;
+		hi.allow = true;
 		hookMM(lpparam);
-		postCheckAllow();
+//		postCheckAllow();
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {

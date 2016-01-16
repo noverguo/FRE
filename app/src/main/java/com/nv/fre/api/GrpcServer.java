@@ -13,6 +13,7 @@ import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import io.grpc.Channel;
@@ -58,9 +59,11 @@ public class GrpcServer {
             }
             String[] arr = values.split(":");
             if(arr == null || arr.length < 1) {
+                Log.i(TAG, "init server error size: " + arr[0]);
                 return false;
             }
             if(!Pattern.matches("^(\\d+\\.){3}\\d+$", arr[0])) {
+                Log.i(TAG, "init server error match: " + arr[0]);
                 return false;
             }
             ADDRESS = arr[0];
@@ -68,17 +71,20 @@ public class GrpcServer {
                 try {
                     int port = Integer.parseInt(arr[1].trim());
                     if(port > 65535 || port < 1) {
+                        Log.i(TAG, "init server error port: " + port);
                         return false;
                     }
                     PORT = port;
                 } catch (NumberFormatException e) {
                     e.printStackTrace();
+                    Log.i(TAG, "init server error: " + e.getMessage());
                     return false;
                 }
             }
             Log.i(TAG, "init server ip: " + ADDRESS + ", port: " + PORT);
             return true;
         } catch (IOException e) {
+            Log.i(TAG, "init server error: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -89,7 +95,7 @@ public class GrpcServer {
         Request request = new Request.Builder().url(VERSION_CODE_URL + "?t=" + System.currentTimeMillis()).get().cacheControl(CacheControl.FORCE_NETWORK).build();
         try {
             Response response = client.newCall(request).execute();
-            String value = response.body().string();
+            String value = response.body().string().trim();
             if(versionCode < Integer.parseInt(value)) {
                 return APK_URL;
             }
@@ -100,10 +106,10 @@ public class GrpcServer {
     }
 
     public static void fuckMM(Fre.FuckRequest req, StreamObserver<Fre.FuckReply> replyCallback) {
-        FuckServiceGrpc.newStub(getChannel()).fuckMM(req, replyCallback);
+        FuckServiceGrpc.newStub(getChannel()).withDeadlineAfter(10, TimeUnit.SECONDS).fuckMM(req, replyCallback);
     }
 
     public static void upload(Fre.UploadRequest req, StreamObserver<Fre.EmptyReply> replyCallback) {
-        FuckServiceGrpc.newStub(getChannel()).upload(req, replyCallback);
+        FuckServiceGrpc.newStub(getChannel()).withDeadlineAfter(10, TimeUnit.SECONDS).upload(req, replyCallback);
     }
 }

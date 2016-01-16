@@ -29,6 +29,7 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import com.nv.fre.Const;
 import com.nv.fre.FREApplication;
 import com.nv.fre.R;
 import com.nv.fre.Settings;
@@ -176,24 +177,36 @@ public class SettingActivity extends Activity {
 		bgHandler.post(new Runnable() {
 			@Override
 			public void run() {
-				try {
-					PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
-					final String url = GrpcServer.checkUpdate(pi.versionCode);
-					if(url != null) {
-						runOnUiThread(new Runnable() {
-							@Override
-							public void run() {
-								showUpdateDialog(url);
-							}
-						});
-					}
-				} catch (PackageManager.NameNotFoundException e) {
+				final String url = GrpcServer.checkUpdate(Const.VERSION_CODE);
+				if (url != null) {
+					runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							showUpdateDialog(url);
+						}
+					});
 				}
 			}
 		});
 	}
 
+	private boolean inFront;
+	@Override
+	protected void onResume() {
+		super.onResume();
+		inFront = true;
+	}
+
+	@Override
+	protected void onPause() {
+		super.onPause();
+		inFront = false;
+	}
+
 	private void showUpdateDialog(final String url) {
+		if(!inFront) {
+			return;
+		}
 		final MaterialDialog mMaterialDialog = new MaterialDialog(this);
 		mMaterialDialog.setTitle("版本更新").setMessage("有重要版本更新，是否开始下载？")
 				.setPositiveButton("马上下载", new View.OnClickListener() {
