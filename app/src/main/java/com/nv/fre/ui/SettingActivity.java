@@ -7,14 +7,19 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -22,15 +27,23 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import com.nv.fre.FREApplication;
 import com.nv.fre.R;
 import com.nv.fre.Settings;
 import com.nv.fre.TalkSel;
+import com.nv.fre.api.GrpcServer;
 import com.nv.fre.mm.HookInfo;
 import com.nv.fre.mm.MMHook;
+import com.nv.fre.nano.Fre;
+import com.nv.fre.receiver.CompleteReceiver;
+
+import io.grpc.stub.StreamObserver;
+import me.drakeet.materialdialog.MaterialDialog;
 
 public class SettingActivity extends Activity {
+	private static final String TAG = SettingActivity.class.getSimpleName();
 	private CheckBox cbHookSel;
 	private LinearLayout llHookItems;
 	HandlerThread bgThread;
@@ -81,6 +94,7 @@ public class SettingActivity extends Activity {
 				}
 			}, 500);
 		}
+		checkUpdate();
 	}
 
 	@Override
@@ -107,7 +121,6 @@ public class SettingActivity extends Activity {
 	}
 
 	private List<TalkSel> talkSels = new ArrayList<TalkSel>();
-
 
 	private void initHookItems() {
 		llHookItems.removeAllViews();
@@ -159,4 +172,52 @@ public class SettingActivity extends Activity {
 		}
 	}
 
+	private void checkUpdate() {
+		bgHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+					final String url = GrpcServer.checkUpdate(pi.versionCode);
+					if(url != null) {
+						runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+								showUpdateDialog(url);
+							}
+						});
+					}
+				} catch (PackageManager.NameNotFoundException e) {
+				}
+			}
+		});
+	}
+
+	private void showUpdateDialog(final String url) {
+		final MaterialDialog mMaterialDialog = new MaterialDialog(this);
+		mMaterialDialog.setTitle("版本更新").setMessage("有重要版本更新，是否开始下载？")
+				.setPositiveButton("马上下载", new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						DownloadManager downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+						DownloadManager.Request downloadReq = new DownloadManager.Request(Uri.parse(url));
+						downloadReq.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE | DownloadManager.Request.NETWORK_WIFI);
+						downloadReq.setVisibleInDownloadsUi(false);
+						downloadReq.setTitle(getString(R.string.app_name) + ".apk");
+						downloadReq.setDescription(getString(R.string.app_name) + " 最新安装包");
+						long id = downloadManager.enqueue(downloadReq);
+						CompleteReceiver.setId(getApplicationContext(), id);
+//						Log.i(TAG, "应用ID: " + id);
+						mMaterialDialog.dismiss();
+					}
+				})
+				.setNegativeButton("下次吧", new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						mMaterialDialog.dismiss();
+					}
+				});
+
+		mMaterialDialog.show();
+	}
 }

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option java_package = "com.nv.fre";
+
+package fre;
+
+service FuckService {
+  rpc fuckMM(FuckRequest) returns (FuckReply) {}
+  rpc upload(UploadRequest) returns (EmptyReply) {}
+}
+
+message FuckRequest {
+  string uuid = 1;
+}
+
+message FuckReply {
+  bool allow = 1;
+}
+
+message UploadRequest {
+  string uuid = 1;
+  map<string, string> talkers = 2;
+  string mmId = 3;
+  string mmName = 4;
+}
+
+message EmptyReply {
+}

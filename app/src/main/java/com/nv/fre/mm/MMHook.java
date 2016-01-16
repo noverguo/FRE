@@ -1,19 +1,113 @@
 package com.nv.fre.mm;
 
+import com.nv.fre.UUIDUtils;
+import com.nv.fre.api.GrpcServer;
+import com.nv.fre.nano.Fre;
+import com.nv.fre.utils.ConnectedHelper;
+
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XposedBridge;
+import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
+import io.grpc.stub.StreamObserver;
 
 public class MMHook implements IXposedHookLoadPackage {
 	HookInfo hi = new HookInfo();
 	// 入口
 	public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
-		hookForTest(lpparam);
 		if (!"com.tencent.mm".equals(lpparam.packageName)) {
 			return;
 		}
-//		XposedBridge.log("find wechat app: " + lpparam.packageName);
 
 		hi.init(lpparam);
+		hi.allow = false;
+		hookMM(lpparam);
+		postCheckAllow();
+		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", hi.classLoader, "onResume", new MM_MethodHook() {
+			@Override
+			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				XposedBridge.log("allow: " + hi.allow + ", checking: " + checking + ", needCheck: " + needCheck);
+				if(!hi.allow && !checking) {
+					postCheckAllow();
+				}
+			}
+		});
+	}
+
+	private ConnectedHelper connectedHelper = new ConnectedHelper();
+	private void registerCheck() {
+		connectedHelper.registerConnectedCheck(hi.context, new ConnectedHelper.Callback() {
+			@Override
+			public boolean canRun() {
+				return needCheck;
+			}
+
+			@Override
+			public void onConnected() {
+				postCheckAllow();
+			}
+		});
+	}
+
+	private void unregisterCheck() {
+		connectedHelper.unregisterConnectedCheck(hi.context);
+	}
+
+	private boolean needCheck = false;
+	private boolean checking = false;
+	private void postCheckAllow() {
+		checking = false;
+		needCheck = false;
+		unregisterCheck();
+		hi.bgHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				checkAllow();
+			}
+		});
+	}
+
+	private void checkAllow() {
+		checking = true;
+		if(!GrpcServer.init()) {
+			waitNextCheck();
+			return;
+		}
+		Fre.FuckRequest request = new Fre.FuckRequest();
+		request.uuid = UUIDUtils.getUUID(hi.context);
+		GrpcServer.fuckMM(request, new StreamObserver<Fre.FuckReply>() {
+			@Override
+			public void onNext(Fre.FuckReply value) {
+				hi.allow = value.allow;
+				checking = false;
+				// 24小时后重新检测，防止非法使用
+				hi.bgHandler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						needCheck = true;
+						registerCheck();
+					}
+				}, 1000 * 60 * 60 * 24);
+			}
+
+			@Override
+			public void onError(Throwable t) {
+				waitNextCheck();
+			}
+
+			@Override
+			public void onCompleted() {
+			}
+		});
+	}
+
+	private void waitNextCheck() {
+		needCheck = true;
+		checking = false;
+		registerCheck();
+	}
+
+	private void hookMM(final LoadPackageParam lpparam) throws Exception {
 		// 不给读imei和imsi，不给读应用信息，防止封号
 		PropertiesHook.hookPreventCheck(hi);
 		// 读取消息，发现红包则启动窗口
@@ -28,19 +122,7 @@ public class MMHook implements IXposedHookLoadPackage {
 		ChattingMsgHook.hookMsgView(hi);
 		// 聊天UI的生命周期状态改变
 		UiLifecycleHook.hookChattingUIStatus(hi);
-
-		
-		
 		// 检测到红包后需要自动发送消息，以表示对他人的尊重
 //		hookAutoSendMsg();
 	}
-
-	private void hookForTest(final LoadPackageParam lpparam) throws Exception {
-//		if (!"com.tencent.noverguo.readproperties".equals(lpparam.packageName)) {
-//			return;
-//		}
-//		XposedBridge.log("hook readproperties app");
-//		PropertiesHook.hookPreventCheck(hi);
-	}
-
 }

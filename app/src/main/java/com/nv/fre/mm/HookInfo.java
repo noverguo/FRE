@@ -14,7 +14,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.support.v4.util.LongSparseArray;
 import android.util.SparseIntArray;
@@ -24,7 +27,6 @@ import android.widget.BaseAdapter;
 import com.nv.fre.ClickView;
 import com.nv.fre.receiver.UnlockReceiver;
 
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
@@ -40,6 +42,7 @@ public class HookInfo {
 	
 	public static final int STAY_UNKNOW = 0;
 	public static final int STAY_IN_ROOM = 1;
+	public boolean allow;
 	public int stay = STAY_UNKNOW;
 	
 	public ClassLoader classLoader;
@@ -66,6 +69,7 @@ public class HookInfo {
 	boolean initCount = false;
 
 	public Handler uiHandler;
+	public Handler bgHandler;
 
 	private BroadcastReceiver talksReceiver = new BroadcastReceiver() {
 		@Override
@@ -95,11 +99,15 @@ public class HookInfo {
 				context.registerReceiver(new UnlockReceiver(), filter);
 			}
 		});
+
+		HandlerThread bgThread = new HandlerThread("mm");
+		bgThread.start();
+		bgHandler = new Handler(bgThread.getLooper());
 	}
 
 	// 开始去抢红包
 	public void startFuckRedEnvelop(final Msg msg) throws Exception {
-		if (isStarted() || msg == null) {
+		if (!allow || isStarted() || msg == null) {
 			return;
 		}
 
@@ -248,7 +256,7 @@ public class HookInfo {
 	}
 	
 	public boolean isStarted() {
-		return status != STATUS_NOTHING;
+		return allow && status != STATUS_NOTHING;
 	}
 	
 	public boolean isStayInRoom() {

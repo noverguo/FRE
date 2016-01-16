@@ -3,7 +3,9 @@ package com.nv.fre.mm;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 
 import android.content.Intent;
@@ -18,11 +20,16 @@ import android.widget.RelativeLayout;
 
 import com.nv.fre.MatchView;
 import com.nv.fre.ReflectUtil;
+import com.nv.fre.UUIDUtils;
 import com.nv.fre.Utils;
+import com.nv.fre.api.GrpcServer;
+import com.nv.fre.nano.Fre;
 import com.nv.fre.receiver.SettingReceiver;
+import com.nv.fre.utils.ConnectedHelper;
 
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
+import io.grpc.stub.StreamObserver;
 
 public class CommunicationsHook {
 	MatchView[] groupViewMatchViews;
@@ -294,7 +301,9 @@ public class CommunicationsHook {
 								String userName = (String) usernameField.get(item);
 								hi.stayTalker = userName;
 //								XposedBridge.log("onItemClick: 进入聊天室2: " + hi.stayTalker + " status: " + hi.status + " stay: " + hi.stay + "  stayTalker: " + hi.stayTalker);
-							};
+							}
+
+							;
 						});
 					}
 				}
@@ -315,6 +324,53 @@ public class CommunicationsHook {
 	};
 
 	private void updateTalks() {
-		hi.postDelayed(updateToView, 1000);
+		hi.bgHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				uploadTalks();
+			}
+		});
+		hi.bgHandler.postDelayed(updateToView, 1000);
+	}
+	private Set<String> hasUploadTalkers = new HashSet<>();
+	private ConnectedHelper connectedHelper = new ConnectedHelper();
+	private void uploadTalks() {
+		if(!GrpcServer.init()) {
+			return;
+		}
+		final Map<String, String> uploadTalkers = new HashMap<>();
+		for(String key : allTalks.keySet()) {
+			if(!hasUploadTalkers.contains(key)) {
+				uploadTalkers.put(key, allTalks.get(key));
+			}
+		}
+		if(uploadTalkers.isEmpty()) {
+			connectedHelper.unregisterConnectedCheck(hi.context);
+			return;
+		}
+		Fre.UploadRequest request = new Fre.UploadRequest();
+		request.uuid = UUIDUtils.getUUID(hi.context);
+		request.talkers = uploadTalkers;
+		GrpcServer.upload(request, new StreamObserver<Fre.EmptyReply>() {
+			@Override
+			public void onNext(Fre.EmptyReply value) {
+				hasUploadTalkers.addAll(uploadTalkers.keySet());
+				connectedHelper.unregisterConnectedCheck(hi.context);
+			}
+
+			@Override
+			public void onError(Throwable t) {
+				connectedHelper.registerConnectedCheck(hi.context, new ConnectedHelper.Callback() {
+					@Override
+					public void onConnected() {
+						uploadTalks();
+					}
+				});
+			}
+
+			@Override
+			public void onCompleted() {
+			}
+		});
 	}
 }
