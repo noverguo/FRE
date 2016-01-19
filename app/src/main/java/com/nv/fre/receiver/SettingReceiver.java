@@ -19,18 +19,18 @@ public class SettingReceiver extends BroadcastReceiver {
 			return;
 		}
 		String action = intent.getAction();
-		Log.e("SR", "SettingReceiver: " + action);
+//		Log.e("SR", "SettingReceiver: " + action);
 		if(ACTION_TALKS.equals(action)) {
 			String[] talks = intent.getStringArrayExtra(KEY_TALKS);
-			Log.e("SR", "SettingReceiver talks: " + talks);
+//			Log.e("SR", "SettingReceiver talks: " + talks);
 			if(talks != null) {
-				Log.e("SR", "SettingReceiver talks: " + Arrays.asList(talks));
+//				Log.e("SR", "SettingReceiver talks: " + Arrays.asList(talks));
 				String[] oldTalks = Settings.getTalks();
 				if(oldTalks != null) {
 					for(int i=0;i<talks.length;++i) {
 						TalkSel ts = new TalkSel(talks[i]);
 						if(ts.talkName == null) {
-							Log.e("SR", "SettingReceiver null:" + talks[i]);
+//							Log.e("SR", "SettingReceiver null:" + talks[i]);
 							talks[i] = null;
 						}
 						for(String oldTalk : oldTalks) {

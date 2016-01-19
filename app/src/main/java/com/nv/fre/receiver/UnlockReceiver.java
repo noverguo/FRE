@@ -20,16 +20,16 @@ public class UnlockReceiver extends BroadcastReceiver {
 		String action = intent.getAction();
 		if (ACTION_UNLOCK.equals(action)) {
 			KeyguardManager km = (KeyguardManager) FREApplication.getContext().getSystemService(Context.KEYGUARD_SERVICE);
-			Log.e("FRE", "解锁屏幕..: " + ", " + km.inKeyguardRestrictedInputMode() + ", " + screenLock);
+//			Log.e("FRE", "解锁屏幕..: " + ", " + km.inKeyguardRestrictedInputMode() + ", " + screenLock);
 			if(km.inKeyguardRestrictedInputMode() || screenLock) {
 				// 键盘锁管理器对象
 				TransparentActivity.unlock();
 			}
 		} else if(Intent.ACTION_SCREEN_ON.equals(action)) {
-			Log.e("FRE", Intent.ACTION_SCREEN_ON);
+//			Log.e("FRE", Intent.ACTION_SCREEN_ON);
 			screenLock = false;
 		} else if(Intent.ACTION_SCREEN_OFF.equals(action)) {
-			Log.e("FRE", Intent.ACTION_SCREEN_OFF);
+//			Log.e("FRE", Intent.ACTION_SCREEN_OFF);
 			screenLock = true;
 		}
 	}

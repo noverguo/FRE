@@ -15,6 +15,9 @@ public class IncomeMsgHook {
 			boolean hookCloseDetail = false;
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				if(!hi.allow) {
+					return;
+				}
 				try {
 					if (!hookCloseDetail) {
 						RedEnvelopeHook.hookCloseDetailRedEnvelope(hi);

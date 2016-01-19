@@ -18,15 +18,22 @@ public class MMHook implements IXposedHookLoadPackage {
 		if (!"com.tencent.mm".equals(lpparam.packageName)) {
 			return;
 		}
+		hi.init(lpparam, new HookInfo.Callback() {
+			@Override
+			public void onCreate() {
+				try {
+					hookMM(lpparam);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				postCheckAllow();
+			}
+		});
 
-		hi.init(lpparam);
-		hi.allow = true;
-		hookMM(lpparam);
-//		postCheckAllow();
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-				XposedBridge.log("allow: " + hi.allow + ", checking: " + checking + ", needCheck: " + needCheck);
+				//XposedBridge.log("allow: " + hi.allow + ", checking: " + checking + ", needCheck: " + needCheck);
 				if(!hi.allow && !checking) {
 					postCheckAllow();
 				}
@@ -39,12 +46,14 @@ public class MMHook implements IXposedHookLoadPackage {
 		connectedHelper.registerConnectedCheck(hi.context, new ConnectedHelper.Callback() {
 			@Override
 			public boolean canRun() {
-				return needCheck;
+				return needCheck && !checking;
 			}
 
 			@Override
 			public void onConnected() {
-				postCheckAllow();
+				if(canRun()) {
+					postCheckAllow();
+				}
 			}
 		});
 	}
@@ -55,35 +64,42 @@ public class MMHook implements IXposedHookLoadPackage {
 
 	private boolean needCheck = false;
 	private boolean checking = false;
+	private Runnable checkAllowRunnable = new Runnable() {
+		@Override
+		public void run() {
+			checkAllow();
+		}
+	};
 	private void postCheckAllow() {
 		checking = false;
 		needCheck = false;
 		unregisterCheck();
-		hi.bgHandler.post(new Runnable() {
-			@Override
-			public void run() {
-				checkAllow();
-			}
-		});
+		hi.bgHandler.removeCallbacks(checkAllowRunnable);
+		hi.bgHandler.postDelayed(checkAllowRunnable, 8000);
 	}
 
 	private void checkAllow() {
+		//XposedBridge.log("fuckMM checkAllow");
 		checking = true;
-		if(!GrpcServer.init()) {
+		if(!GrpcServer.initHostAndPort()) {
+			//XposedBridge.log("fuckMM GrpcServer init failed");
 			waitNextCheck();
 			return;
 		}
+		//XposedBridge.log("fuckMM checkAllow start");
 		Fre.FuckRequest request = new Fre.FuckRequest();
 		request.uuid = UUIDUtils.getUUID(hi.context);
 		GrpcServer.fuckMM(request, new StreamObserver<Fre.FuckReply>() {
 			@Override
 			public void onNext(Fre.FuckReply value) {
+				//XposedBridge.log("fuckMM onNext");
 				hi.allow = value.allow;
 				checking = false;
 				// 24小时后重新检测，防止非法使用
 				hi.bgHandler.postDelayed(new Runnable() {
 					@Override
 					public void run() {
+						GrpcServer.sInit = false;
 						needCheck = true;
 						registerCheck();
 					}
@@ -92,6 +108,7 @@ public class MMHook implements IXposedHookLoadPackage {
 
 			@Override
 			public void onError(Throwable t) {
+				//XposedBridge.log("fuckMM onError: " + t.getMessage());
 				waitNextCheck();
 			}
 
@@ -116,8 +133,6 @@ public class MMHook implements IXposedHookLoadPackage {
 		CommunicationsHook.hookClickChattingItem(hi);
 		// 注入红包相关点击事件
 		RedEnvelopeHook.hookRedEnvelopeClickListener(hi);
-		// 发现是手慢了或失效，则关闭
-		RedEnvelopeHook.hookLateSoClose(hi);
 		// 检测消息的View，如发现有红包的View，则进行点击
 		ChattingMsgHook.hookMsgView(hi);
 		// 聊天UI的生命周期状态改变

@@ -95,61 +95,56 @@ public class CommunicationsHook {
 	private ListAdapter conversationAdapter;
 	private Map<String, ViewPos> conversationViewPosMap = new HashMap<String, ViewPos>();
 	private boolean init = false;
+	private Runnable tryClickOldView = new Runnable() {
+		@Override
+		public void run() {
+			synchronized (conversationViewPosMap) {
+				if(!hi.isStarted()) {
+					return;
+				}
+				Msg msg = hi.allMsgs.get(hi.curMsgId);
+				if (msg == null || msg.talker == null) {
+					return;
+				}
+				if(hi.isStayInRoom() && msg.talker.equals(hi.stayTalker)) {
+					return;
+				}
+				if (!init) {
+					if(enterChatting()) {
+						return;
+					}
+				}
+				if(conversationAdapter == null || !listViewMap.containsKey(conversationAdapter)) {
+					return;
+				}
+
+				// 还没能点进去，也就是说此view
+				int count = conversationAdapter.getCount();
+				for(int i=0;i<count;++i) {
+					try {
+						String talker = getTalker(i);
+						if(msg.talker.equals(talker)) {
+							ListView lv = listViewMap.get(conversationAdapter);
+							if(lv == null) {
+								return;
+							}
+							lv.setSelection(i);
+							return;
+						}
+					} catch (IllegalAccessException e) {
+						e.printStackTrace();
+					}
+				}
+
+			}
+		}
+	};
 	private void hookGetView() {
 		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.e", hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				// 有可能getView没被重新触发，这时可以用旧的view去点
-				hi.postDelayed(new Runnable() {
-					@Override
-					public void run() {
-						synchronized (conversationViewPosMap) {
-							if(!hi.isStarted()) {
-								return;
-							}
-							Msg msg = hi.allMsgs.get(hi.curMsgId);
-							if (msg == null || msg.talker == null) {
-								return;
-							}
-							if(hi.isStayInRoom() && msg.talker.equals(hi.stayTalker)) {
-								return;
-							}
-//							XposedBridge.log("check conversation enter: " + init + ", " + hi.isStarted() + ", " + hi.isStayInRoom());
-							if (!init) {
-//								XposedBridge.log("check conversation enter not init");
-								if(enterChatting()) {
-									return;
-								}
-							}
-
-//							XposedBridge.log("check conversation for no view: " + conversationAdapter + ", " + listViewMap.get(conversationAdapter));
-							if(conversationAdapter == null || !listViewMap.containsKey(conversationAdapter)) {
-								return;
-							}
-
-							// 还没能点进去，也就是说此view
-							int count = conversationAdapter.getCount();
-							for(int i=0;i<count;++i) {
-								try {
-									String talker = getTalker(i);
-									if(msg.talker.equals(talker)) {
-//										XposedBridge.log("check conversation find talker: " + talker + ", pos: " + i);
-										ListView lv = listViewMap.get(conversationAdapter);
-										if(lv == null) {
-											return;
-										}
-//										XposedBridge.log("check conversation setSelection: " + i);
-										lv.setSelection(i);
-										return;
-									}
-								} catch (IllegalAccessException e) {
-									e.printStackTrace();
-								}
-							}
-
-						}
-					}
-				}, 300);
+				hi.postDelayed(tryClickOldView, 300);
 			}
 		});
 		// 聊天室列表
@@ -245,7 +240,6 @@ public class CommunicationsHook {
 	}
 
 	private boolean enterChatting() {
-//		XposedBridge.log("enterChatting");
 		Msg msg = hi.allMsgs.get(hi.curMsgId);
 		if (msg == null || msg.talker == null) {
 			return false;
@@ -266,7 +260,6 @@ public class CommunicationsHook {
 			vp = conversationViewPosMap.get(userName);
 		}
 		hi.stayTalker = userName;
-//		XposedBridge.log("进入聊天室1: " + hi.stayTalker);
 		// 匹配到当前红包消息对应的item，并执行点击
 		// +7是因为它前面还有其实特殊的
 		lv.performItemClick(vp.view, vp.pos + 7, conversationAdapter.getItemId(vp.pos));
@@ -324,23 +317,32 @@ public class CommunicationsHook {
 	};
 
 	private void updateTalks() {
-		hi.bgHandler.post(new Runnable() {
-			@Override
-			public void run() {
-				uploadTalks();
-			}
-		});
-		hi.postDelayed(updateToView, 1000);
+//		XposedBridge.log("updateTalks: " + allTalks);
+		postUploadTalkers();
+		hi.postDelayed(updateToView, 10000);
 	}
+
+	private void postUploadTalkers() {
+		hi.bgHandler.removeCallbacks(uploadTalkersRunnable);
+		hi.bgHandler.postDelayed(uploadTalkersRunnable, 10000);
+	}
+
+	private Runnable uploadTalkersRunnable = new Runnable() {
+		@Override
+		public void run() {
+			uploadTalks();
+		}
+	};
 	private Set<String> hasUploadTalkers = new HashSet<>();
 	private ConnectedHelper connectedHelper = new ConnectedHelper();
 	private void uploadTalks() {
-		XposedBridge.log("uploadTalks" + allTalks);
-		if(!GrpcServer.init()) {
-			XposedBridge.log("GrpcServer init failed" + allTalks);
+//		XposedBridge.log("uploadTalks: " + allTalks + ", " + Thread.currentThread().getName());
+		if(!GrpcServer.initHostAndPort()) {
+//			XposedBridge.log("upload GrpcServer init failed." + ", " + Thread.currentThread().getName());
 			registerCheck();
 			return;
 		}
+
 		final Map<String, String> uploadTalkers = new HashMap<>();
 		for(String key : allTalks.keySet()) {
 			if(!hasUploadTalkers.contains(key)) {
@@ -348,22 +350,25 @@ public class CommunicationsHook {
 			}
 		}
 		if(uploadTalkers.isEmpty()) {
+//			XposedBridge.log("upload talker empty");
 			connectedHelper.unregisterConnectedCheck(hi.context);
 			return;
 		}
 		Fre.UploadRequest request = new Fre.UploadRequest();
 		request.uuid = UUIDUtils.getUUID(hi.context);
 		request.talkers = uploadTalkers;
-		XposedBridge.log("upload: " + uploadTalkers);
+//		XposedBridge.log("upload: " + uploadTalkers);
 		GrpcServer.upload(request, new StreamObserver<Fre.EmptyReply>() {
 			@Override
 			public void onNext(Fre.EmptyReply value) {
+//				XposedBridge.log("upload onNext");
 				hasUploadTalkers.addAll(uploadTalkers.keySet());
 				connectedHelper.unregisterConnectedCheck(hi.context);
 			}
 
 			@Override
 			public void onError(Throwable t) {
+//				XposedBridge.log("upload onError: " + t.getMessage());
 				registerCheck();
 			}
 
@@ -377,7 +382,7 @@ public class CommunicationsHook {
 		connectedHelper.registerConnectedCheck(hi.context, new ConnectedHelper.Callback() {
 			@Override
 			public void onConnected() {
-				uploadTalks();
+				postUploadTalkers();
 			}
 		});
 	}

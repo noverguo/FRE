@@ -25,6 +25,7 @@ import android.view.View;
 import android.widget.BaseAdapter;
 
 import com.nv.fre.ClickView;
+import com.nv.fre.api.GrpcServer;
 import com.nv.fre.receiver.UnlockReceiver;
 
 import de.robv.android.xposed.XposedHelpers;
@@ -84,25 +85,29 @@ public class HookInfo {
 		}
 	};
 
-	public void init(final LoadPackageParam lpparam) {
+	public void init(final LoadPackageParam lpparam, final Callback callback) {
 		this.classLoader = lpparam.classLoader;
 		// hook Application.onCreate
 		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				context = (Context) param.thisObject;
+				GrpcServer.init(context);
 				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
 				context.registerReceiver(talksReceiver, intentFilter);
 
 				IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
 				filter.addAction(Intent.ACTION_SCREEN_OFF);
 				context.registerReceiver(new UnlockReceiver(), filter);
+
+				allow = false;
+
+				HandlerThread bgThread = new HandlerThread("nv");
+				bgThread.start();
+				bgHandler = new Handler(bgThread.getLooper());
+				callback.onCreate();
 			}
 		});
-
-		HandlerThread bgThread = new HandlerThread("mm");
-		bgThread.start();
-		bgHandler = new Handler(bgThread.getLooper());
 	}
 
 	// 开始去抢红包
@@ -273,5 +278,9 @@ public class HookInfo {
 	
 	public void setStayInRoom() {
 		stay = STAY_IN_ROOM;
+	}
+
+	public static interface Callback {
+		void onCreate();
 	}
 }

@@ -65,27 +65,27 @@ public class Utils {
 		}
 		if(clazz == TextView.class) {
 			if(debug) {
-				XposedBridge.log(obj.getClass().getName() + " --> TextView: " + (obj instanceof TextView));
+//				XposedBridge.log(obj.getClass().getName() + " --> TextView: " + (obj instanceof TextView));
 			}
 			return obj instanceof TextView;
 		} else if(clazz == LinearLayout.class) {
 			if(debug) {
-				XposedBridge.log(obj.getClass().getName() + " --> LinearLayout: " + (obj instanceof LinearLayout));
+//				XposedBridge.log(obj.getClass().getName() + " --> LinearLayout: " + (obj instanceof LinearLayout));
 			}
 			return obj instanceof LinearLayout;
 		} else if(clazz == RelativeLayout.class) {
 			if(debug) {
-				XposedBridge.log(obj.getClass().getName() + " --> RelativeLayout: " + (obj instanceof RelativeLayout));
+//				XposedBridge.log(obj.getClass().getName() + " --> RelativeLayout: " + (obj instanceof RelativeLayout));
 			}
 			return obj instanceof RelativeLayout;
 		} else if(clazz == ImageView.class) {
 			if(debug) {
-				XposedBridge.log(obj.getClass().getName() + " --> ImageView: " + (obj instanceof ImageView));
+//				XposedBridge.log(obj.getClass().getName() + " --> ImageView: " + (obj instanceof ImageView));
 			}
 			return obj instanceof ImageView;
 		} else if(clazz == View.class) {
 			if(debug) {
-				XposedBridge.log(obj.getClass().getName() + " --> View: " + (obj instanceof View));
+//				XposedBridge.log(obj.getClass().getName() + " --> View: " + (obj instanceof View));
 			}
 			return obj instanceof View;
 		}

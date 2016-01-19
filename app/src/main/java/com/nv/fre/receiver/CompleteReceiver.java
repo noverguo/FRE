@@ -53,7 +53,7 @@ public class CompleteReceiver extends BroadcastReceiver {
 //				}
 //				cursor.close();
 			} else {
-				Log.i(TAG, "安装应用: " + path);
+//				Log.i(TAG, "安装应用: " + path);
 				installApk(context, path);
 			}
 		}

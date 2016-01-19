@@ -1,25 +1,16 @@
 package com.nv.fre.ui;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.Executor;
-
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -27,7 +18,6 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 import com.nv.fre.Const;
 import com.nv.fre.FREApplication;
@@ -36,11 +26,13 @@ import com.nv.fre.Settings;
 import com.nv.fre.TalkSel;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.mm.HookInfo;
-import com.nv.fre.mm.MMHook;
-import com.nv.fre.nano.Fre;
 import com.nv.fre.receiver.CompleteReceiver;
 
-import io.grpc.stub.StreamObserver;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import me.drakeet.materialdialog.MaterialDialog;
 
 public class SettingActivity extends Activity {

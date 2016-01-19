@@ -88,7 +88,7 @@ public class ChattingMsgHook {
 			@Override
 			public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
-					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
+//					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
 					if(param.args[0].getClass() == adapterClass) {
 						listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
 					}
@@ -107,6 +107,9 @@ public class ChattingMsgHook {
 			View.OnClickListener clickCallback = null;
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				if(!hi.allow) {
+					return;
+				}
 				View curView = (View) param.thisObject;
 				Object[] args = param.args;
 				if (args[0] != null && args[0] instanceof View.OnClickListener) {
@@ -201,13 +204,16 @@ public class ChattingMsgHook {
 					}
 					hi.redEnvelopClickView.remove(hi.curMsgId);
 					hi.status = HookInfo.STATUS_CLICK_RED_ENVELOPE_VIEW;
-					XposedBridge.log("点击领取红包: " + hi.curMsgId);
+//					XposedBridge.log("点击领取红包: " + hi.curMsgId);
 					// 点击领取红包
 					curClickView.clickCallback.onClick(curClickView.view);
 					hi.doneMsgIds.add(hi.curMsgId);
 				}
 			};
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+				if(!hi.allow) {
+					return;
+				}
 				final View view = (View) param.getResult();
 				if (view == null) {
 					return;
