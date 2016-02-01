@@ -7,6 +7,7 @@ package fre;
 service FuckService {
   rpc fuckMM(FuckRequest) returns (FuckReply) {}
   rpc upload(UploadRequest) returns (EmptyReply) {}
+  rpc getHookClasses(GetHookClassesRequest) returns (GetHookClassesReply) {}
 }
 
 message FuckRequest {
@@ -25,4 +26,14 @@ message UploadRequest {
 }
 
 message EmptyReply {
+}
+
+message GetHookClassesRequest {
+	string uuid = 1;
+	int32 mmVersionCode = 3;
+}
+
+message GetHookClassesReply {
+	bool support = 1;
+	map<string, string> hookClassesMap = 3;
 }

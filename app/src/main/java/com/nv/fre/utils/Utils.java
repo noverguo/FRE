@@ -1,4 +1,4 @@
-package com.nv.fre;
+package com.nv.fre.utils;
 
 import android.view.View;
 import android.view.ViewGroup;
@@ -7,6 +7,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+
+import com.nv.fre.MatchView;
 
 import java.util.ArrayList;
 import java.util.List;

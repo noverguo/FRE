@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -19,9 +20,9 @@ import android.widget.ListView;
 import android.widget.RelativeLayout;
 
 import com.nv.fre.MatchView;
-import com.nv.fre.ReflectUtil;
-import com.nv.fre.UUIDUtils;
-import com.nv.fre.Utils;
+import com.nv.fre.utils.ReflectUtil;
+import com.nv.fre.utils.UUIDUtils;
+import com.nv.fre.utils.Utils;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.nano.Fre;
 import com.nv.fre.receiver.SettingReceiver;
@@ -41,22 +42,33 @@ public class CommunicationsHook {
 		groupViewMatchViews[3] = new MatchView(0, new Class<?>[] { View.class });
 	}
 
+	private static CommunicationsHook ck;
 	/**
 	 * 启动窗口后，可能会停在消息列表窗口（具体原因待查），这时需要去点击进入对应的窗口
 	 * 
 	 * @param hi
 	 * @throws Exception
 	 */
-	public static void hookClickChattingItem(final HookInfo hi) throws Exception {
-		final CommunicationsHook ck = new CommunicationsHook(hi);
-		ck.hookAdapter();
+	public static synchronized void hookClickChattingItem(final HookInfo hi) throws Exception {
+		if(ck == null) {
+			ck = new CommunicationsHook(hi);
+		}
+		ck.init();
 		ck.hookGetView();
 		ck.hookItemClick();
 	}
 
+	public static synchronized void hookNoChange(final HookInfo hi) throws Exception {
+		if(ck == null) {
+			ck = new CommunicationsHook(hi);
+		}
+		// setAdapter在刚进入应用时就进行了，而且hook的类是固定不变的，因此需提前hook
+		ck.hookSetAdapter();
+	}
+
 	private HookInfo hi;
 	Map<String, String> allTalks = new HashMap<String, String>();
-	WeakHashMap<ListAdapter, ListView> listViewMap = new WeakHashMap<ListAdapter, ListView>();
+	HashMap<ListAdapter, ListView> listViewMap = new HashMap<ListAdapter, ListView>();
 	Class<?> conversationListViewClass;
 	Class<?> conversationAdapterClass;
 	Class<?> conversationItemClass;
@@ -66,23 +78,38 @@ public class CommunicationsHook {
 
 	public CommunicationsHook(HookInfo hi) throws Exception {
 		this.hi = hi;
-		conversationListViewClass = hi.classLoader.loadClass("com.tencent.mm.ui.conversation.ConversationOverscrollListView");
-		conversationAdapterClass = hi.classLoader.loadClass("com.tencent.mm.ui.conversation.d");
-		conversationItemClass = hi.classLoader.loadClass("com.tencent.mm.storage.r");
-		usernameField = conversationItemClass.getField("field_username");
-		textViewClass = hi.classLoader.loadClass("com.tencent.mm.ui.base.NoMeasuredTextView");
-		getTextMethod = textViewClass.getMethod("getText", new Class<?>[0]);
 	}
 
-	private void hookAdapter() {
+	private void init() throws Exception {
+		conversationListViewClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_LIST_VIEW_CLASS));
+		conversationAdapterClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_ADAPTER_CLASS));
+		conversationItemClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_ITEM_CLASS));
+		usernameField = conversationItemClass.getField(HookClasses.getClassName(HookClasses.KEY_USERNAME_FIELD));
+		textViewClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_TEXTVIEW_CLASS));
+		getTextMethod = textViewClass.getMethod("getText", new Class<?>[0]);
+
+		Iterator<Map.Entry<ListAdapter, ListView>> iter = listViewMap.entrySet().iterator();
+		while(iter.hasNext()) {
+			Map.Entry<ListAdapter, ListView> next = iter.next();
+			if(next.getKey().getClass() != conversationAdapterClass || next.getValue().getClass() != conversationListViewClass) {
+				iter.remove();
+			}
+		}
+	}
+
+
+	private void hookSetAdapter() {
 		// 关联adapter，便于之后使用
 		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new MM_MethodHook() {
 			@Override
 			public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
-					if (param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
-						return;
+					if(conversationListViewClass != null && conversationAdapterClass != null) {
+						if (param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
+							return;
+						}
 					}
+//					XposedBridge.log("setAdapter: " + param.args[0].getClass().getName() + ": " + param.args[0]);
 					listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
 				}
 			}
@@ -140,7 +167,7 @@ public class CommunicationsHook {
 		}
 	};
 	private void hookGetView() {
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.e", hi.classLoader, "onResume", new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_WINDOW_CLASS), hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				// 有可能getView没被重新触发，这时可以用旧的view去点
@@ -148,23 +175,23 @@ public class CommunicationsHook {
 			}
 		});
 		// 聊天室列表
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.d", hi.classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_ADAPTER_CLASS), hi.classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
 			private long pre = 0;
 
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("com.tencent.mm.ui.conversation.d.getView");
 				final View view = (View) param.getResult();
 				if (view == null) {
 					return;
 				}
 				final Integer pos = (Integer) param.args[0];
-				conversationAdapter = (ListAdapter) param.thisObject;
-				Object item = conversationAdapter.getItem(pos);
+                ListAdapter adapter = (ListAdapter) param.thisObject;
+				Object item = adapter.getItem(pos);
+//				XposedBridge.log("聊天室列表getView: " + adapter.getClass().getName() + ": " + adapter);
 				if (item.getClass() != conversationItemClass) {
 					return;
 				}
-
+                conversationAdapter = adapter;
 				String userName = (String) usernameField.get(item);
 				if (userName == null) {
 					return;
@@ -204,6 +231,7 @@ public class CommunicationsHook {
 				if (msg == null || msg.talker == null) {
 					return;
 				}
+//                XposedBridge.log("聊天室列表getView: " + userName + ", " + msg.talker);
 				if (!userName.equals(msg.talker)) {
 					return;
 				}
@@ -337,11 +365,7 @@ public class CommunicationsHook {
 	private ConnectedHelper connectedHelper = new ConnectedHelper();
 	private void uploadTalks() {
 //		XposedBridge.log("uploadTalks: " + allTalks + ", " + Thread.currentThread().getName());
-		if(!GrpcServer.initHostAndPort()) {
-//			XposedBridge.log("upload GrpcServer init failed." + ", " + Thread.currentThread().getName());
-			registerCheck();
-			return;
-		}
+		GrpcServer.initHostAndPort();
 
 		final Map<String, String> uploadTalkers = new HashMap<>();
 		for(String key : allTalks.keySet()) {

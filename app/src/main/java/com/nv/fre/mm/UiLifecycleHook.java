@@ -23,21 +23,21 @@ public class UiLifecycleHook {
 
 	private void hookStatus(final HookInfo hi) throws Exception {
 		// com.tencent.mm.ui.chatting.ChattingUI$a
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.chatting.ChattingUI$a", hi.classLoader, "onResume", new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_CHATTING_WINDOW_CLASS), hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				// 当前在聊天室中
 				hi.setStayInRoom();
 			}
 		});
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.chatting.ChattingUI$a", hi.classLoader, "onPause", new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_CHATTING_WINDOW_CLASS), hi.classLoader, "onPause", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				hi.setStayUnknow();
 			}
 		});
 
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.conversation.e", hi.classLoader, "onResume", new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_WINDOW_CLASS), hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				if (hi.stay != HookInfo.STAY_IN_ROOM) {
@@ -46,14 +46,14 @@ public class UiLifecycleHook {
 			}
 		});
 		
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", hi.classLoader, "onPause", new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_LAUNCHER_UI_CLASS), hi.classLoader, "onPause", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				UnlockReceiver.screenLock = true;
 			}
 		});
 
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", hi.classLoader, "onResume", new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_LAUNCHER_UI_CLASS), hi.classLoader, "onResume", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				UnlockReceiver.screenLock = false;

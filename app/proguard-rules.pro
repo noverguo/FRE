@@ -15,5 +15,5 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
-
+-dontwarn **
 -keep public class * extends de.robv.android.xposed.IXposedHookLoadPackage

@@ -4,7 +4,6 @@ import java.lang.reflect.Field;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,7 +18,7 @@ import android.widget.TextView;
 
 import com.nv.fre.ClickView;
 import com.nv.fre.MatchView;
-import com.nv.fre.Utils;
+import com.nv.fre.utils.Utils;
 
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
@@ -55,43 +54,39 @@ public class ChattingMsgHook {
 	 */
 	public static void hookMsgView(final HookInfo hi) throws Exception {
 		ChattingMsgHook cmh = new ChattingMsgHook(hi);
-		
-		cmh.hookAdapter();
+//		cmh.logAdapter();
+		cmh.init();
 		// 检测红包的View点击事件
 		cmh.hookClickListener();
 		// 发现红包就点击
 		cmh.hookGetView();
-		// 过滤非红包的消息
-//		cmh.hookGetCount();
-//		cmh.hookGetItem();
 	}
 
 	private SparseArray<Object> items;
 	private Class<?> msgClass;
 	private Field msgIdField;
 	private HookInfo hi;
-	private WeakHashMap<ListAdapter, ListView> listViewMap = new WeakHashMap<ListAdapter, ListView>();
 	private ChattingMsgHook(HookInfo hi) throws Exception {
 		this.hi = hi;
+	}
+
+	private void init() throws Exception {
 		items = new SparseArray<Object>();
 		// old: com.tencent.mm.storage.ad
-		// new: com.tencent.mm.storage.ae
-		msgClass = hi.classLoader.loadClass("com.tencent.mm.storage.ae");
-		msgIdField = msgClass.getField("field_msgId");
+		// 1.01: com.tencent.mm.storage.ae
+		// 1.02: com.tencent.mm.storage.ag
+		msgClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_MSG_MODEL_CLASS));
+		msgIdField = msgClass.getField(HookClasses.getClassName(HookClasses.KEY_MSG_ID_FIELD));
 		msgIdField.setAccessible(true);
 	}
-	
-	private void hookAdapter() throws Exception {
-		final Class<?> adapterClass = hi.classLoader.loadClass("com.tencent.mm.ui.chatting.cj");
+
+	private void logAdapter() throws Exception {
 		// 关联adapter，便于之后使用
 		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new MM_MethodHook() {
 			@Override
 			public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
-//					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
-					if(param.args[0].getClass() == adapterClass) {
-						listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
-					}
+					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
 				}
 			}
 		});
@@ -190,7 +185,9 @@ public class ChattingMsgHook {
 	}
 	
 	private void hookGetView() {
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.chatting.cj", hi.classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
+		// 1.01: com.tencent.mm.ui.chatting.cj
+		// 1.02: com.tencent.mm.ui.chatting.cl
+		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_MSG_ADAPTER_CLASS), hi.classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
 			private AtomicBoolean isRun = new AtomicBoolean(false);
 			Runnable clickRedEnvelopCallback = new Runnable() {
 				@Override
@@ -263,87 +260,6 @@ public class ChattingMsgHook {
 					hi.uiHandler.removeCallbacks(clickRedEnvelopCallback);
 					hi.uiHandler.post(clickRedEnvelopCallback);
 				}
-			}
-		});
-	}
-	
-	private void hookGetCount() {
-		// hook BaseAdapter.getCount，ListView.getView之前肯定需要先知道有多少个item
-		// 如果是有新红包消息时，即此时会插入新的view，这时需要，
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", hi.classLoader, "getCount", new MM_MethodHook() {
-			@Override
-			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("com.tencent.mm.ui.i.getCount: " + param.getResult());
-				if (!hi.canFuck()) {
-					return;
-				}
-				if (!hi.initCount) {
-					items.clear();
-					Integer count = (Integer) param.getResult();
-					final BaseAdapter adapter = (BaseAdapter) param.thisObject;
-					int curIdx = 0;
-//					StringBuilder log = new StringBuilder("com.tencent.mm.ui.i.getCount: status: " + hi.status + " :");
-//					log.append(count).append(" --> ");
-					hi.itemMap.clear();
-					for (int i = 0; i < count; ++i) {
-						Object item = adapter.getItem(i);
-						if (item == null) {
-							continue;
-						}
-						if (item.getClass() != msgClass) {
-							return;
-						}
-						Long msgId = (Long) msgIdField.get(item);
-//						log.append(msgId);
-						if (hi.redEnvelopMsgs.get(msgId) != null || hi.noDoRedEnvelopMsgIds.contains(msgId)) {
-//							log.append(": ").append(curIdx).append(" -> ").append(i);
-							// itemMap.put(curIdx++, i);
-							items.put(curIdx++, item);
-						}
-//						log.append(",");
-					}
-//					XposedBridge.log(log.toString());
-					if (items.size() > 0) {
-						hi.initCount = true;
-						hi.uiHandler.post(new Runnable() {
-							@Override
-							public void run() {
-								adapter.notifyDataSetChanged();
-							}
-						});
-					}
-				}
-				if (items.size() > 0) {
-//					XposedBridge.log("com.tencent.mm.ui.i.getCount change: " + items.size());
-					param.setResult(items.size());
-				}
-			}
-		});
-	}
-
-	private void hookGetItem() {
-		XposedHelpers.findAndHookMethod("com.tencent.mm.ui.i", hi.classLoader, "getItem", int.class, new MM_MethodHook() {
-			@Override
-			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("com.tencent.mm.ui.i.getItem: " + param.args[0]);
-				if (!hi.canFuck() || !hi.initCount) {
-					return;
-				}
-				Object item = param.getResult();
-				if (item == null || item.getClass() != msgClass) {
-					return;
-				}
-				// int val = itemMap.get(((Integer)param.args[0]), -999);
-				Object curItem = items.get(((Integer) param.args[0]));
-				// if(val == -999) {
-				if (curItem == null) {
-					return;
-				}
-//				XposedBridge.log("com.tencent.mm.ui.i.getItem: status: " + hi.status + " :" + (Integer) param.args[0] + " --> " + msgIdField.get(curItem));
-				// 转移到红包的位置
-				// BaseAdapter adapter = (BaseAdapter) param.thisObject;
-				// param.setResult(adapter.getItem(val));
-				param.setResult(curItem);
 			}
 		});
 	}

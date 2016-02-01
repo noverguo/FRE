@@ -1,4 +1,4 @@
-package com.nv.fre;
+package com.nv.fre.utils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;

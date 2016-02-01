@@ -12,19 +12,10 @@ public class IncomeMsgHook {
 	 */
 	public static void hookReadMsg(final HookInfo hi) {
 		XposedHelpers.findAndHookMethod(ContentValues.class, "size", new MM_MethodHook() {
-			boolean hookCloseDetail = false;
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				if(!hi.allow) {
 					return;
-				}
-				try {
-					if (!hookCloseDetail) {
-						RedEnvelopeHook.hookCloseDetailRedEnvelope(hi);
-						hookCloseDetail = true;
-					}
-				} catch (Exception e) {
-					e.printStackTrace();
 				}
 				
 				Msg msg = new Msg((ContentValues) param.thisObject);
@@ -44,7 +35,7 @@ public class IncomeMsgHook {
 				hi.queue.add(msg);
 				hi.allMsgs.put(msg.msgId, msg);
 
-//				XposedBridge.log("newMsg: " + " status: " + hi.status + ", " + msg.toString());
+//				XposedBridge.log("有新的消息: " + " status: " + hi.status + ", " + msg.toString());
 				
 				// 过滤掉不想抢的群
 				if (!hi.grepTalks.isEmpty() && !hi.grepTalks.contains(msg.talker)) {

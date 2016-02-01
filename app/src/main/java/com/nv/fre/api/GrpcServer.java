@@ -6,6 +6,7 @@ import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.FuckServiceGrpc;
 import com.nv.fre.nano.Fre;
 import com.squareup.okhttp.CacheControl;
@@ -30,12 +31,12 @@ import io.grpc.stub.StreamObserver;
  * Created by nover on 2016/1/16 0016.
  */
 public class GrpcServer {
-    private static String SERVER_DATA_URL = "https://raw.githubusercontent.com/nvlove/freserver/master/s.dat";
-    private static String VERSION_CODE_URL = "https://raw.githubusercontent.com/nvlove/freserver/master/v.dat";
-    private static String APK_URL = "https://raw.githubusercontent.com/nvlove/freserver/master/fre.apk";
+    private static String SERVER_DATA_URL = "https://raw.githubusercontent.com/freserver/server/master/s.dat";
+    private static String VERSION_CODE_URL = "https://raw.githubusercontent.com/freserver/server/master/v.dat";
+    private static String APK_URL = "https://raw.githubusercontent.com/freserver/server/master/fre.apk";
     public static final boolean USE_TLS = false;
-    public static String HOST = "54.201.110.240";
-    public static int PORT = USE_TLS ? 50052 : 50051;
+    public static String HOST = BuildConfig.DEBUG ? "10.9.37.137" : "54.201.110.240";
+    public static int PORT = USE_TLS ? 51426 : 51425;
     public static final String CA_PATH = "ca.pem";
     public static final String REPLACE_SERVER_HOST = "foo.test.google.fr";
     public static final int NETWORK_TIMEOUT_SEC = 10;
@@ -87,7 +88,7 @@ public class GrpcServer {
         sContext = context.getApplicationContext();
     }
 
-    public static boolean sInit = false;
+    public static boolean sInit = BuildConfig.DEBUG;
     public static synchronized boolean initHostAndPort() {
         if(sInit) {
             return true;
@@ -161,5 +162,9 @@ public class GrpcServer {
 
     public static void upload(Fre.UploadRequest req, StreamObserver<Fre.EmptyReply> replyCallback) {
         FuckServiceGrpc.newStub(getChannel()).withDeadlineAfter(NETWORK_TIMEOUT_SEC, TimeUnit.SECONDS).upload(req, replyCallback);
+    }
+
+    public static void getHookClasses(Fre.GetHookClassesRequest req, StreamObserver<Fre.GetHookClassesReply> replyCallback) {
+        FuckServiceGrpc.newStub(getChannel()).withDeadlineAfter(NETWORK_TIMEOUT_SEC, TimeUnit.SECONDS).getHookClasses(req, replyCallback);
     }
 }

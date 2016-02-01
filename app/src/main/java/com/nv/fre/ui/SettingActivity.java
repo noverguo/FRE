@@ -1,6 +1,5 @@
 package com.nv.fre.ui;
 
-import android.app.Activity;
 import android.app.DownloadManager;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
@@ -10,6 +9,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
@@ -18,6 +19,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import com.nv.fre.Const;
 import com.nv.fre.FREApplication;
@@ -27,6 +29,7 @@ import com.nv.fre.TalkSel;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.mm.HookInfo;
 import com.nv.fre.receiver.CompleteReceiver;
+import com.nv.fre.utils.PackageUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -35,7 +38,7 @@ import java.util.Set;
 
 import me.drakeet.materialdialog.MaterialDialog;
 
-public class SettingActivity extends Activity {
+public class SettingActivity extends AppCompatActivity {
 	private static final String TAG = SettingActivity.class.getSimpleName();
 	private CheckBox cbHookSel;
 	private LinearLayout llHookItems;
@@ -46,6 +49,31 @@ public class SettingActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setUnlocked();
 		setContentView(R.layout.setting_ui);
+		Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        toolbar.setLogo(R.mipmap.ic_launcher);
+        toolbar.setOnClickListener(new View.OnClickListener() {
+            private static final String WE_CHAT_URL = "https://raw.githubusercontent.com/freserver/server/master/wc_1.2.apk";
+            long preClickTime = 0;
+            int clickCount = 0;
+            @Override
+            public void onClick(View view) {
+                long curTime = System.currentTimeMillis();
+                if(curTime - preClickTime < 1000) {
+                    clickCount++;
+                    if(clickCount > 4) {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(WE_CHAT_URL));
+                        startActivity(intent);
+                        Toast.makeText(getApplicationContext(), "如果您的微信版本是最新的版，请先卸载后再安装。", Toast.LENGTH_LONG).show();
+                        clickCount = 0;
+                    }
+                } else {
+                    clickCount = 0;
+                }
+                preClickTime = curTime;
+            }
+        });
+		setSupportActionBar(toolbar);
+
 		bgThread = new HandlerThread("bg");
 		bgThread.start();
 		bgHandler = new Handler(bgThread.getLooper());
@@ -169,7 +197,7 @@ public class SettingActivity extends Activity {
 		bgHandler.post(new Runnable() {
 			@Override
 			public void run() {
-				final String url = GrpcServer.checkUpdate(Const.VERSION_CODE);
+				final String url = GrpcServer.checkUpdate(PackageUtils.getVersionCode(SettingActivity.this, Const.PACKAGE_NAME));
 				if (url != null) {
 					runOnUiThread(new Runnable() {
 						@Override

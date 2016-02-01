@@ -24,10 +24,12 @@ import android.util.SparseIntArray;
 import android.view.View;
 import android.widget.BaseAdapter;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.ClickView;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.receiver.UnlockReceiver;
 
+import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
@@ -100,7 +102,7 @@ public class HookInfo {
 				filter.addAction(Intent.ACTION_SCREEN_OFF);
 				context.registerReceiver(new UnlockReceiver(), filter);
 
-				allow = false;
+				allow = BuildConfig.DEBUG;
 
 				HandlerThread bgThread = new HandlerThread("nv");
 				bgThread.start();
@@ -112,6 +114,7 @@ public class HookInfo {
 
 	// 开始去抢红包
 	public void startFuckRedEnvelop(final Msg msg) throws Exception {
+//		XposedBridge.log("startFuckRedEnvelop: " + allow + ", " + curMsgId + ", " + stay + ", " + status + ", " + stayTalker + ", " + msg.talker);
 		if (!allow || isStarted() || msg == null) {
 			return;
 		}
@@ -120,7 +123,6 @@ public class HookInfo {
 		status = STATUS_START_ACTIVITY;
 		initCount = false;
 		redEnvelopClickView.clear();
-//		XposedBridge.log("startFuckRedEnvelop: " + curMsgId + ", " + stay + ", " + status + ", " + stayTalker + ", " + msg.talker);
 		// 已经在对应的房间中了，则应该可以直接点击红包
 		if (msg.talker.equals(stayTalker)) {
 			if (stay == STAY_IN_ROOM) {

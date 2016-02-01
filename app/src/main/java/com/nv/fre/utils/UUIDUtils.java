@@ -1,4 +1,4 @@
-package com.nv.fre;
+package com.nv.fre.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;

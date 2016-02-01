@@ -5,5 +5,6 @@ package com.nv.fre;
  */
 public class Const {
     public static final String PACKAGE_NAME = "com.nv.fre";
-    public static final int VERSION_CODE = 2;
+    public static final String MM_PACKAGE_NAME = "com.tencent.mm";
+
 }
