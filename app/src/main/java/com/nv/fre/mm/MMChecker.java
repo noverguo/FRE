@@ -4,23 +4,22 @@ import com.nv.fre.api.GrpcServer;
 import com.nv.fre.mm.itf.Checker;
 import com.nv.fre.utils.ConnectedHelper;
 
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 /**
  * Created by noverguo on 2016/1/29.
  */
 public class MMChecker implements Checker {
-    HookInfo hi;
+    MMContext hi;
     Callback callback;
-    public void init(HookInfo hookInfo, Callback callback) {
+    public void init(MMContext hookInfo, Callback callback) {
         this.hi = hookInfo;
         this.callback = callback;
         XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", hi.classLoader, "onResume", new MM_MethodHook() {
             @Override
             public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-                //XposedBridge.log("allow: " + hi.allow + ", checking: " + checking + ", needCheck: " + needCheck);
-                if(!hi.allow && isChecking()) {
+//                XposedBridge.log("allow: " + hi.allow + ", checking: " + checking + ", needCheck: " + needCheck);
+                if(!hi.allow && !isChecking()) {
                     postCheckAllow();
                 }
             }

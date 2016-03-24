@@ -9,7 +9,7 @@ public class AutoSendHook {
 	private ImageButton switchToTalk;
 	private ImageButton switchToKeyboard;
 
-	public void hookAutoSendMsg(HookInfo hi) throws Exception {
+	public void hookAutoSendMsg(MMContext hi) throws Exception {
 		final Class<?> mmEditTextClass = hi.classLoader.loadClass("com.tencent.mm.ui.widget.MMEditText");
 		XposedHelpers.findAndHookMethod(TextView.class, "handleTextChanged", CharSequence.class, int.class, int.class, int.class, new MM_MethodHook() {
 			@Override

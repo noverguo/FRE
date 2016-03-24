@@ -7,7 +7,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 import android.content.Intent;
 import android.view.View;
@@ -42,31 +41,34 @@ public class CommunicationsHook {
 		groupViewMatchViews[3] = new MatchView(0, new Class<?>[] { View.class });
 	}
 
-	private static CommunicationsHook ck;
+	private static CommunicationsHook inst;
 	/**
 	 * 启动窗口后，可能会停在消息列表窗口（具体原因待查），这时需要去点击进入对应的窗口
 	 * 
 	 * @param hi
 	 * @throws Exception
 	 */
-	public static synchronized void hookClickChattingItem(final HookInfo hi) throws Exception {
-		if(ck == null) {
-			ck = new CommunicationsHook(hi);
-		}
-		ck.init();
-		ck.hookGetView();
-		ck.hookItemClick();
+	public static synchronized void hookClickChattingItem(final MMContext hi) throws Exception {
+        init(hi);
+		inst.init();
+		inst.hookGetView();
+		inst.hookItemClick();
 	}
 
-	public static synchronized void hookNoChange(final HookInfo hi) throws Exception {
-		if(ck == null) {
-			ck = new CommunicationsHook(hi);
-		}
+	public static synchronized void hookNoChange(final MMContext hi) throws Exception {
+		init(hi);
 		// setAdapter在刚进入应用时就进行了，而且hook的类是固定不变的，因此需提前hook
-		ck.hookSetAdapter();
+		inst.hookSetAdapter();
 	}
 
-	private HookInfo hi;
+    private static void init(MMContext hi) {
+        if(inst == null) {
+            inst = new CommunicationsHook();
+            inst.hi = hi;
+        }
+    }
+
+	private MMContext hi;
 	Map<String, String> allTalks = new HashMap<String, String>();
 	HashMap<ListAdapter, ListView> listViewMap = new HashMap<ListAdapter, ListView>();
 	Class<?> conversationListViewClass;
@@ -76,16 +78,12 @@ public class CommunicationsHook {
 	Class<?> textViewClass;
 	Method getTextMethod;
 
-	public CommunicationsHook(HookInfo hi) throws Exception {
-		this.hi = hi;
-	}
-
 	private void init() throws Exception {
-		conversationListViewClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_LIST_VIEW_CLASS));
-		conversationAdapterClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_ADAPTER_CLASS));
-		conversationItemClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_ITEM_CLASS));
-		usernameField = conversationItemClass.getField(HookClasses.getClassName(HookClasses.KEY_USERNAME_FIELD));
-		textViewClass = hi.classLoader.loadClass(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_TEXTVIEW_CLASS));
+		conversationListViewClass = hi.classLoader.loadClass(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_LIST_VIEW_CLASS));
+		conversationAdapterClass = hi.classLoader.loadClass(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_ADAPTER_CLASS));
+		conversationItemClass = hi.classLoader.loadClass(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_ITEM_CLASS));
+		usernameField = conversationItemClass.getField(ConfuseValue.getConfuseName(ConfuseValue.KEY_USERNAME_FIELD));
+		textViewClass = hi.classLoader.loadClass(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_TEXTVIEW_CLASS));
 		getTextMethod = textViewClass.getMethod("getText", new Class<?>[0]);
 
 		Iterator<Map.Entry<ListAdapter, ListView>> iter = listViewMap.entrySet().iterator();
@@ -97,23 +95,23 @@ public class CommunicationsHook {
 		}
 	}
 
-
+    MM_MethodHook setAdapterMethodHook = new MM_MethodHook() {
+        @Override
+        public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
+            if (param.args != null && param.args.length > 0 && param.args[0] != null) {
+                if(conversationListViewClass != null && conversationAdapterClass != null) {
+                    if (param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
+                        return;
+                    }
+                }
+//					XposedBridge.log("setAdapter: " + param.args[0].getClass().getName() + ": " + param.args[0]);
+                listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
+            }
+        }
+    };
 	private void hookSetAdapter() {
 		// 关联adapter，便于之后使用
-		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, new MM_MethodHook() {
-			@Override
-			public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
-				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
-					if(conversationListViewClass != null && conversationAdapterClass != null) {
-						if (param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
-							return;
-						}
-					}
-//					XposedBridge.log("setAdapter: " + param.args[0].getClass().getName() + ": " + param.args[0]);
-					listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
-				}
-			}
-		});
+		XposedHelpers.findAndHookMethod(ListView.class, "setAdapter", ListAdapter.class, setAdapterMethodHook);
 	}
 	static class ViewPos {
 		View view;
@@ -166,96 +164,98 @@ public class CommunicationsHook {
 			}
 		}
 	};
-	private void hookGetView() {
-		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_WINDOW_CLASS), hi.classLoader, "onResume", new MM_MethodHook() {
-			@Override
-			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-				// 有可能getView没被重新触发，这时可以用旧的view去点
-				hi.postDelayed(tryClickOldView, 300);
-			}
-		});
-		// 聊天室列表
-		XposedHelpers.findAndHookMethod(HookClasses.getClassName(HookClasses.KEY_CONVERSATION_ADAPTER_CLASS), hi.classLoader, "getView", int.class, View.class, ViewGroup.class, new MM_MethodHook() {
-			private long pre = 0;
+    MM_MethodHook delayClickMethodHook = new MM_MethodHook() {
+        @Override
+        public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+            // 有可能getView没被重新触发，这时可以用旧的view去点
+            hi.postDelayed(tryClickOldView, 300);
+        }
+    };
+    MM_MethodHook getViewMethodHook = new MM_MethodHook() {
+        private long pre = 0;
 
-			@Override
-			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-				final View view = (View) param.getResult();
-				if (view == null) {
-					return;
-				}
-				final Integer pos = (Integer) param.args[0];
-                ListAdapter adapter = (ListAdapter) param.thisObject;
-				Object item = adapter.getItem(pos);
+        @Override
+        public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+            final View view = (View) param.getResult();
+            if (view == null) {
+                return;
+            }
+            final Integer pos = (Integer) param.args[0];
+            ListAdapter adapter = (ListAdapter) param.thisObject;
+            Object item = adapter.getItem(pos);
 //				XposedBridge.log("聊天室列表getView: " + adapter.getClass().getName() + ": " + adapter);
-				if (item.getClass() != conversationItemClass) {
-					return;
-				}
-                conversationAdapter = adapter;
-				String userName = (String) usernameField.get(item);
-				if (userName == null) {
-					return;
-				}
-				// 获得聊天室的名称
-				String displayName = getDisplayName(view);
-				if (!allTalks.containsKey(userName)) {
-					allTalks.put(userName, displayName);
-					updateTalks();
-				}
-				synchronized (conversationViewPosMap) {
-					// 缓存聊天室列表
-					if (!init) {
-						conversationViewPosMap.clear();
-						init = true;
-						// 设置过期
-						hi.postDelayed(new Runnable() {
-							@Override
-							public void run() {
-								if(init) {
-									init = false;
-								}
-							}
-						}, 3000);
-					}
-					ViewPos vp = new ViewPos();
-					vp.view = view;
-					vp.pos = pos;
-					conversationViewPosMap.put(userName, vp);
-				}
-				long cur = hi.curMsgId << 16 + pos;
-				if (cur == pre) {
-					return;
-				}
+            if (item.getClass() != conversationItemClass) {
+                return;
+            }
+            conversationAdapter = adapter;
+            String userName = (String) usernameField.get(item);
+            if (userName == null) {
+                return;
+            }
+            // 获得聊天室的名称
+            String displayName = getDisplayName(view);
+            if (!allTalks.containsKey(userName)) {
+                allTalks.put(userName, displayName);
+                updateTalks();
+            }
+            synchronized (conversationViewPosMap) {
+                // 缓存聊天室列表
+                if (!init) {
+                    conversationViewPosMap.clear();
+                    init = true;
+                    // 设置过期
+                    hi.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if(init) {
+                                init = false;
+                            }
+                        }
+                    }, 3000);
+                }
+                ViewPos vp = new ViewPos();
+                vp.view = view;
+                vp.pos = pos;
+                conversationViewPosMap.put(userName, vp);
+            }
+            long cur = hi.curMsgId << 16 + pos;
+            if (cur == pre) {
+                return;
+            }
 
-				Msg msg = hi.allMsgs.get(hi.curMsgId);
-				if (msg == null || msg.talker == null) {
-					return;
-				}
+            Msg msg = hi.allMsgs.get(hi.curMsgId);
+            if (msg == null || msg.talker == null) {
+                return;
+            }
 //                XposedBridge.log("聊天室列表getView: " + userName + ", " + msg.talker);
-				if (!userName.equals(msg.talker)) {
-					return;
-				}
+            if (!userName.equals(msg.talker)) {
+                return;
+            }
 
-				enterChatting();
+            enterChatting();
 
-				pre = cur;
-			}
+            pre = cur;
+        }
 
-			private String getDisplayName(View view) throws Exception {
-				if (textViewClass != null && getTextMethod != null) {
-					View displayView = Utils.getChild(groupViewMatchViews, view);
-					if (displayView != null) {
-						if (displayView.getClass() == textViewClass) {
-							Object res = getTextMethod.invoke(displayView, new Object[0]);
-							if (res != null) {
-								return res.toString();
-							}
-						}
-					}
-				}
-				return "";
-			}
-		});
+        private String getDisplayName(View view) throws Exception {
+            if (textViewClass != null && getTextMethod != null) {
+                View displayView = Utils.getChild(groupViewMatchViews, view);
+                if (displayView != null) {
+                    if (displayView.getClass() == textViewClass) {
+                        Object res = getTextMethod.invoke(displayView, new Object[0]);
+                        if (res != null) {
+                            return res.toString();
+                        }
+                    }
+                }
+            }
+            return "";
+        }
+    };
+	private void hookGetView() {
+		XposedHelpers.findAndHookMethod(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_WINDOW_CLASS), hi.classLoader, "onResume", delayClickMethodHook);
+		// 聊天室列表
+		XposedHelpers.findAndHookMethod(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_ADAPTER_CLASS), hi.classLoader, "getView", int.class, View.class, ViewGroup.class, getViewMethodHook);
 	}
 
 	private String getTalker(int pos) throws IllegalAccessException {
@@ -294,42 +294,43 @@ public class CommunicationsHook {
 		return true;
 	}
 
-	private void hookItemClick() {
-		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, new MM_MethodHook() {
-			@Override
-			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-				if (param.thisObject.getClass() != conversationListViewClass) {
-					return;
-				}
-				final ListView conversationListView = (ListView) param.thisObject;
-				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
-					OnItemClickListener listener = (OnItemClickListener) param.args[0];
+    MM_MethodHook itemClickMethodHook = new MM_MethodHook() {
+        @Override
+        public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+            if (param.thisObject.getClass() != conversationListViewClass) {
+                return;
+            }
+            final ListView conversationListView = (ListView) param.thisObject;
+            if (param.args != null && param.args.length > 0 && param.args[0] != null) {
+                OnItemClickListener listener = (OnItemClickListener) param.args[0];
 //					 XposedBridge.log("setOnItemClickListener: " + listener);
-					Class<? extends OnItemClickListener> itemListenerClass = listener.getClass();
-					Method method = ReflectUtil.getMethod(itemListenerClass, "onItemClick");
-					if (method != null) {
-						XposedBridge.hookAllMethods(itemListenerClass, method.getName(), new MM_MethodHook() {
-							public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-								Integer pos = (Integer) param.args[2];
-								if (pos == null || pos < 0 || pos > conversationListView.getCount()) {
-									return;
-								}
-								Object item = conversationListView.getItemAtPosition(pos);
-								if (item == null) {
-									return;
-								}
-								// 点击进入聊天室后，需要记录下来
-								String userName = (String) usernameField.get(item);
-								hi.stayTalker = userName;
+                Class<? extends OnItemClickListener> itemListenerClass = listener.getClass();
+                Method method = ReflectUtil.getMethod(itemListenerClass, "onItemClick");
+                if (method != null) {
+                    XposedBridge.hookAllMethods(itemListenerClass, method.getName(), new MM_MethodHook() {
+                        public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
+                            Integer pos = (Integer) param.args[2];
+                            if (pos == null || pos < 0 || pos > conversationListView.getCount()) {
+                                return;
+                            }
+                            Object item = conversationListView.getItemAtPosition(pos);
+                            if (item == null) {
+                                return;
+                            }
+                            // 点击进入聊天室后，需要记录下来
+                            String userName = (String) usernameField.get(item);
+                            hi.stayTalker = userName;
 //								XposedBridge.log("onItemClick: 进入聊天室2: " + hi.stayTalker + " status: " + hi.status + " stay: " + hi.stay + "  stayTalker: " + hi.stayTalker);
-							}
+                        }
 
-							;
-						});
-					}
-				}
-			}
-		});
+                        ;
+                    });
+                }
+            }
+        }
+    };
+	private void hookItemClick() {
+		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, itemClickMethodHook);
 	}
 
 	private Runnable updateToView = new Runnable() {
@@ -347,7 +348,8 @@ public class CommunicationsHook {
 	private void updateTalks() {
 //		XposedBridge.log("updateTalks: " + allTalks);
 		postUploadTalkers();
-		hi.postDelayed(updateToView, 10000);
+		hi.uiHandler.removeCallbacks(updateToView);
+		hi.uiHandler.postDelayed(updateToView, 1000);
 	}
 
 	private void postUploadTalkers() {

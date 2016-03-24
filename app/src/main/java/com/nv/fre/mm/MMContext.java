@@ -1,6 +1,5 @@
 package com.nv.fre.mm;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -14,13 +13,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.support.v4.util.LongSparseArray;
-import android.util.SparseIntArray;
 import android.view.View;
 import android.widget.BaseAdapter;
 
@@ -33,9 +29,10 @@ import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
-public class HookInfo {
-	public static final String ACTION_TALKS = "com.nv.fuckredenvelope.mm.MMHook.ACTION_TALKS";
-	public static final String KEY_TALKS = "com.nv.fuckredenvelope.mm.MMHook.KEY_TALKS";
+public class MMContext {
+	public static final String ACTION_TALKS = "com.nv.fre.mm.MMHook.ACTION_TALKS";
+	public static final String KEY_TALKS = "com.nv.fre.mm.MMHook.KEY_TALKS";
+	public static final String KEY_DISPLAY_ALL = "com.nv.fre.mm.MMHook.KEY_DISPLAY_ALL";
 	
 	public static final int STATUS_NOTHING = 0;
 	public static final int STATUS_START_ACTIVITY = 1;
@@ -58,7 +55,9 @@ public class HookInfo {
 	public Map<View, ClickView> clickCallbackMap = new HashMap<View, ClickView>();
 	public Set<Long> doneMsgIds = new HashSet<Long>();
 	public Set<Long> noDoRedEnvelopMsgIds = new HashSet<Long>();
-	public Set<String> grepTalks = new HashSet<String>();
+	public Map<String, Boolean> grepTalks = new HashMap<String, Boolean>();
+    public Map<String, Integer> delayTalks = new HashMap<String, Integer>();
+	public boolean displayJustRE = true;
 	public BaseAdapter chattingListViewAdapter;
 	
 	public LongSparseArray<ClickView> redEnvelopClickView = new LongSparseArray<ClickView>(); 
@@ -66,8 +65,6 @@ public class HookInfo {
 	
 	public String stayTalker = null;
 	public long curMsgId = -1;
-
-	public SparseIntArray itemMap = new SparseIntArray();
 	
 	boolean initCount = false;
 
@@ -78,14 +75,27 @@ public class HookInfo {
 		@Override
 		public void onReceive(Context context, Intent intent) {
 			if (ACTION_TALKS.equals(intent.getAction())) {
-				String[] talks = intent.getStringArrayExtra(KEY_TALKS);
-				grepTalks.clear();
-				if (talks != null) {
-					grepTalks.addAll(Arrays.asList(talks));
-				}
+				final String[] talks = intent.getStringArrayExtra(KEY_TALKS);
+				displayJustRE = intent.getBooleanExtra(KEY_DISPLAY_ALL, true);
+				MMSettings.setTalks(context, talks);
+				MMSettings.setDisplayAll(context, displayJustRE);
+				setTalksSetting(talks);
+
 			}
 		}
 	};
+
+	private void setTalksSetting(String[] talks) {
+		grepTalks.clear();
+		if (talks != null) {
+			for(String talk : talks) {
+				String[] arr = talk.split(":");
+				grepTalks.put(arr[0], arr.length > 1 ? Boolean.parseBoolean(arr[1]) : true);
+                delayTalks.put(arr[0], arr.length > 2 ? Integer.parseInt(arr[2]) : 0);
+			}
+//            XposedBridge.log("setTalksSetting: " + grepTalks + " --> " + delayTalks);
+		}
+	}
 
 	public void init(final LoadPackageParam lpparam, final Callback callback) {
 		this.classLoader = lpparam.classLoader;
@@ -108,12 +118,24 @@ public class HookInfo {
 				bgThread.start();
 				bgHandler = new Handler(bgThread.getLooper());
 				callback.onCreate();
+
+				// 读取过滤信息
+				displayJustRE = MMSettings.isDisplayAll(context);
+				String[] talks = MMSettings.getTalks(context);
+				if (talks != null && talks.length > 0) {
+					setTalksSetting(talks);
+				}
 			}
 		});
 	}
 
+    public void start(final Msg msg) throws Exception {
+        redEnvelopMsgs.put(msg.msgId, msg);
+        startFuckRedEnvelop(msg);
+    }
+
 	// 开始去抢红包
-	public void startFuckRedEnvelop(final Msg msg) throws Exception {
+	private void startFuckRedEnvelop(final Msg msg) throws Exception {
 //		XposedBridge.log("startFuckRedEnvelop: " + allow + ", " + curMsgId + ", " + stay + ", " + status + ", " + stayTalker + ", " + msg.talker);
 		if (!allow || isStarted() || msg == null) {
 			return;
@@ -225,7 +247,7 @@ public class HookInfo {
 			ClickView curClickView = redEnvelopClickView.get(curMsgId);
 			redEnvelopClickView.remove(curMsgId);
 
-			status = HookInfo.STATUS_CLICK_RED_ENVELOPE_VIEW;
+			status = MMContext.STATUS_CLICK_RED_ENVELOPE_VIEW;
 			// 点击领取红包
 			curClickView.clickCallback.onClick(curClickView.view);
 			doneMsgIds.add(curMsgId);

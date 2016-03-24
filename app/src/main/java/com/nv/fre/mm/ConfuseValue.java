@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * Created by noverguo on 2016/1/29.
  */
-public class HookClasses {
+public class ConfuseValue {
     public static final String KEY_MSG_MODEL_CLASS = "KEY_MSG_MODEL_CLASS";
     public static final String KEY_MSG_ADAPTER_CLASS = "KEY_MSG_ADAPTER_CLASS";
     public static final String KEY_RE_OPEN_BUTTON_FIELD = "KEY_RE_OPEN_BUTTON_FIELD";
@@ -31,10 +31,9 @@ public class HookClasses {
 
     private static Map<String, String> sDefaultValue;
 
-
     private static Map<String, String> sHookClassesMap;
     private static boolean sInit;
-    public static void init(Map<String, String> map) {
+    static {
         sDefaultValue = new HashMap<>();
         sDefaultValue.put(KEY_MSG_ID_FIELD, "field_msgId");
         sDefaultValue.put(KEY_CONVERSATION_ADAPTER_CLASS, "com.tencent.mm.ui.conversation.d");
@@ -50,7 +49,8 @@ public class HookClasses {
         sDefaultValue.put(KEY_LUCKY_MONEY_RECEIVE_UI_RE_SET_ONCLICK_METHOD_ARG3_CLASS, "com.tencent.mm.r.j");
 
         sDefaultValue.put(KEY_USERNAME_FIELD, "field_username");
-
+    }
+    public static synchronized void init(Map<String, String> map) {
         sHookClassesMap = map;
         if(sHookClassesMap != null && !sHookClassesMap.isEmpty()) {
             sInit = true;
@@ -58,10 +58,11 @@ public class HookClasses {
             sInit = false;
         }
     }
-    public static boolean isInit() {
+    public static synchronized boolean isInit() {
         return sInit;
     }
-    public static String getClassName(String key) {
+
+    public static synchronized String getConfuseName(String key) {
         if(isInit()) {
             if(sHookClassesMap.containsKey(key)) {
                 return sHookClassesMap.get(key);

@@ -4,6 +4,8 @@ public class TalkSel {
 	public String talkName;
 	public String showName;
 	public boolean check;
+	public boolean displayJustRE = false;
+    public int delay;
 
 	public TalkSel(String value) {
 		if(value == null) {
@@ -12,6 +14,12 @@ public class TalkSel {
 		String[] arr = value.split(":");
 		if(arr.length > 1) {
 			check = Boolean.valueOf(arr[1]);
+			if(arr.length > 2) {
+				displayJustRE = Boolean.valueOf(arr[2]);
+                if(arr.length > 3) {
+                    delay = Integer.parseInt(arr[3]);
+                }
+			}
 		}
 		String[] strings = arr[0].split(",");
 		talkName = strings[0];
@@ -22,7 +30,7 @@ public class TalkSel {
 
 	@Override
 	public String toString() {
-		return talkName + (showName == null ? "" : ("," + showName)) + ":" + check;
+		return talkName + (showName == null ? "" : ("," + showName)) + ":" + check + ":" + displayJustRE + ":" + delay;
 	}
 
 	@Override

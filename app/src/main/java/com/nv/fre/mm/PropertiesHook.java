@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 public class PropertiesHook {
@@ -36,7 +35,7 @@ public class PropertiesHook {
 	 * 
 	 * @param hi
 	 */
-	public static void hookPreventCheck(HookInfo hi) {
+	public static void hookPreventCheck(MMContext hi) {
 		PropertiesHook ph = new PropertiesHook();
 		ph.hookUnableUploadException(hi);
 		ph.hookReadImeiAndImsi(hi);
@@ -56,7 +55,7 @@ public class PropertiesHook {
 	 * 
 	 * @param hi
 	 */
-	private void hookUnableUploadException(HookInfo hi) {
+	private void hookUnableUploadException(MMContext hi) {
 		XposedHelpers.findAndHookMethod(Thread.class, "setDefaultUncaughtExceptionHandler", UncaughtExceptionHandler.class, new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
@@ -121,7 +120,7 @@ public class PropertiesHook {
 	 * 
 	 * @param hi
 	 */
-	private void hookReadImeiAndImsi(HookInfo hi) {
+	private void hookReadImeiAndImsi(MMContext hi) {
 		// 1）获取运营商sim卡imsi号：
 		// String android_imsi = telephonyManager.getSubscriberId();//获取手机IMSI号
 		// String IMSI =
@@ -193,7 +192,7 @@ public class PropertiesHook {
 	 * 禁止读到当前应用
 	 * @param hi
      */
-	private void hookReadPackage(HookInfo hi) {
+	private void hookReadPackage(MMContext hi) {
 		XposedHelpers.findAndHookMethod(ContextWrapper.class, "getPackageManager", new MM_MethodHook() {
 			private boolean init = false;
 			@Override

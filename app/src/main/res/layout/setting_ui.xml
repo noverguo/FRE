@@ -13,12 +13,24 @@
 
     </android.support.v7.widget.Toolbar>
 
-    <CheckBox
-        android:id="@+id/hook_sel"
-        android:layout_width="wrap_content"
+
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:checked="true"
-        android:text="@string/hook_sel_all" />
+        android:orientation="horizontal">
+        <CheckBox
+            android:id="@+id/hook_sel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/hook_sel_all" />
+        <CheckBox
+            android:id="@+id/hook_display"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/hook_display_just_re" />
+    </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"

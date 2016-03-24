@@ -12,15 +12,15 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import io.grpc.stub.StreamObserver;
 
 public class MMHook implements IXposedHookLoadPackage {
-	HookInfo hi = new HookInfo();
+	MMContext hi = new MMContext();
 	MMChecker allowChecker = new MMChecker();
 	MMChecker hookClassesChecker = new MMChecker();
 	// 入口
 	public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
-		if (lpparam.isFirstApplication && !Const.MM_PACKAGE_NAME.equals(lpparam.packageName)) {
+		if (!lpparam.isFirstApplication || !Const.MM_PACKAGE_NAME.equals(lpparam.packageName)) {
 			return;
 		}
-		hi.init(lpparam, new HookInfo.Callback() {
+		hi.init(lpparam, new MMContext.Callback() {
 			@Override
 			public void onCreate() {
 				if(!lpparam.isFirstApplication) {
@@ -62,7 +62,7 @@ public class MMHook implements IXposedHookLoadPackage {
 							public void onNext(Fre.GetHookClassesReply rsp) {
 //								XposedBridge.log("getHookClasses onNext: " + rsp.hookClassesMap);
 								if(rsp.support) {
-									HookClasses.init(rsp.hookClassesMap);
+									ConfuseValue.init(rsp.hookClassesMap);
 									try {
 										hookChange();
 										checker.finish();
@@ -105,7 +105,7 @@ public class MMHook implements IXposedHookLoadPackage {
 		// 启动窗口后，可能会停在消息列表窗口（具体原因待查），这时需要去点击进入对应的窗口
 		CommunicationsHook.hookClickChattingItem(hi);
 		// 注入红包相关点击事件
-		RedEnvelopeHook.hookRedEnvelopeClickListener(hi);
+		RedEnvelopeHook.hookOnResumeInit(hi);
 		// 检测消息的View，如发现有红包的View，则进行点击
 		ChattingMsgHook.hookMsgView(hi);
 		// 聊天UI的生命周期状态改变

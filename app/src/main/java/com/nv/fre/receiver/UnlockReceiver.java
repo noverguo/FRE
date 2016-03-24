@@ -10,7 +10,7 @@ import com.nv.fre.FREApplication;
 import com.nv.fre.ui.TransparentActivity;
 
 public class UnlockReceiver extends BroadcastReceiver {
-	public static final String ACTION_UNLOCK = "com.nv.fuckredenvelope.receiver.UnlockReceiver";
+	public static final String ACTION_UNLOCK = "com.nv.fre.receiver.UnlockReceiver.ACTION_UNLOCK";
 	public static boolean screenLock = true;
 	@Override
 	public void onReceive(Context context, Intent intent) {

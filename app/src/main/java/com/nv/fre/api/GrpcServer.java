@@ -35,7 +35,7 @@ public class GrpcServer {
     private static String VERSION_CODE_URL = "https://raw.githubusercontent.com/freserver/server/master/v.dat";
     private static String APK_URL = "https://raw.githubusercontent.com/freserver/server/master/fre.apk";
     public static final boolean USE_TLS = false;
-    public static String HOST = BuildConfig.DEBUG ? "10.9.37.137" : "54.201.110.240";
+    public static String HOST = BuildConfig.DEBUG ? "10.9.37.148" : "54.201.110.240";
     public static int PORT = USE_TLS ? 51426 : 51425;
     public static final String CA_PATH = "ca.pem";
     public static final String REPLACE_SERVER_HOST = "foo.test.google.fr";

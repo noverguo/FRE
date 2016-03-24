@@ -1,17 +1,14 @@
 package com.nv.fre.receiver;
 
-import java.util.Arrays;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.util.Log;
 
 import com.nv.fre.Settings;
 import com.nv.fre.TalkSel;
 
 public class SettingReceiver extends BroadcastReceiver {
-	public static final String ACTION_TALKS = "com.nv.fuckredenvelope.receiver.SettingReceiver";
+	public static final String ACTION_TALKS = "com.nv.fre.receiver.SettingReceiver.ACTION_TALKS";
 	public static final String KEY_TALKS = "key_talks";
 	@Override
 	public void onReceive(Context context, Intent intent) {
