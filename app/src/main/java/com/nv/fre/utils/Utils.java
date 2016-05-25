@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.MatchView;
 
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ public class Utils {
 			if(parent == null) {
 				return false;
 			}
-			XposedBridge.log("matchParent: " + parent.getClass().getSimpleName() + " <--> " + className);
+			if(BuildConfig.DEBUG) XposedBridge.log("matchParent: " + parent.getClass().getSimpleName() + " <--> " + className);
 			if(!parent.getClass().getSimpleName().equals(className)) {
 				return false;
 			}
@@ -67,27 +68,27 @@ public class Utils {
 		}
 		if(clazz == TextView.class) {
 			if(debug) {
-//				XposedBridge.log(obj.getClass().getName() + " --> TextView: " + (obj instanceof TextView));
+//				if(BuildConfig.DEBUG) XposedBridge.log(obj.getClass().getName() + " --> TextView: " + (obj instanceof TextView));
 			}
 			return obj instanceof TextView;
 		} else if(clazz == LinearLayout.class) {
 			if(debug) {
-//				XposedBridge.log(obj.getClass().getName() + " --> LinearLayout: " + (obj instanceof LinearLayout));
+//				if(BuildConfig.DEBUG) XposedBridge.log(obj.getClass().getName() + " --> LinearLayout: " + (obj instanceof LinearLayout));
 			}
 			return obj instanceof LinearLayout;
 		} else if(clazz == RelativeLayout.class) {
 			if(debug) {
-//				XposedBridge.log(obj.getClass().getName() + " --> RelativeLayout: " + (obj instanceof RelativeLayout));
+//				if(BuildConfig.DEBUG) XposedBridge.log(obj.getClass().getName() + " --> RelativeLayout: " + (obj instanceof RelativeLayout));
 			}
 			return obj instanceof RelativeLayout;
 		} else if(clazz == ImageView.class) {
 			if(debug) {
-//				XposedBridge.log(obj.getClass().getName() + " --> ImageView: " + (obj instanceof ImageView));
+//				if(BuildConfig.DEBUG) XposedBridge.log(obj.getClass().getName() + " --> ImageView: " + (obj instanceof ImageView));
 			}
 			return obj instanceof ImageView;
 		} else if(clazz == View.class) {
 			if(debug) {
-//				XposedBridge.log(obj.getClass().getName() + " --> View: " + (obj instanceof View));
+//				if(BuildConfig.DEBUG) XposedBridge.log(obj.getClass().getName() + " --> View: " + (obj instanceof View));
 			}
 			return obj instanceof View;
 		}
@@ -109,7 +110,7 @@ public class Utils {
 		if(curView == null) {
 			return;
 		}
-		XposedBridge.log(space + curView.getClass().getName() + ": " + getPrintString(curView));
+		if(BuildConfig.DEBUG) XposedBridge.log(space + curView.getClass().getName() + ": " + getPrintString(curView));
 		if (curView instanceof ViewGroup) {
 			space += "  ";
 			ViewGroup group = (ViewGroup) curView;
@@ -126,7 +127,7 @@ public class Utils {
 		}
 		String space = "";
 		for(int i=parents.size()-1;i>=0;--i) {
-			XposedBridge.log(space + parents.get(i));
+			if(BuildConfig.DEBUG) XposedBridge.log(space + parents.get(i));
 			space += "  ";
 		}
 	}

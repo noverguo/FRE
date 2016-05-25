@@ -2,6 +2,8 @@ package com.nv.fre.mm;
 
 import android.content.ContentValues;
 
+import com.nv.fre.BuildConfig;
+
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
@@ -40,17 +42,19 @@ public class IncomeMsgHook {
 				hi.queue.add(msg);
 				hi.allMsgs.put(msg.msgId, msg);
 
-//				XposedBridge.log("有新的消息: " + " status: " + hi.status + ", " + msg.toString());
+				if(BuildConfig.DEBUG) XposedBridge.log("有新的消息: " + " status: " + hi.status + ", " + msg.toString() + ", " + hi.hookAll + ", " + hi.grepTalks.get(msg.talker) + ", " + msg.talker);
 				
 				// 过滤掉不想抢的群
-				if (!hi.grepTalks.isEmpty() && !hi.grepTalks.containsKey(msg.talker)) {
+				if (!hi.hookAll && (!hi.grepTalks.containsKey(msg.talker) || !hi.grepTalks.get(msg.talker).check)) {
 					return;
 				}
 				
 				String content = msg.content;
 				if (content.contains("领取红包") && content.contains("微信红包") && content.contains("查看红包")) {
-//                    XposedBridge.log("发现红包: " + msg.talker + ": " + hi.delayTalks);
-                    if(hi.delayTalks.containsKey(msg.talker)) {
+                    if(BuildConfig.DEBUG) XposedBridge.log("发现红包: " + msg.talker + ": " + hi.grepTalks);
+                    if (hi.hookAll) {
+                        hi.start(msg);
+                    } else {
                         hi.postDelayed(new Runnable() {
                             @Override
                             public void run() {
@@ -59,14 +63,11 @@ public class IncomeMsgHook {
                                 } catch (Exception e) {
                                 }
                             }
-                        }, hi.delayTalks.get(msg.talker));
-                    } else {
-                        hi.start(msg);
+                        }, hi.grepTalks.get(msg.talker).delay * 1000);
                     }
-
 				} else {
 					// 如果需要只显示红包，则把消息改掉
-					if((hi.grepTalks.isEmpty() && hi.displayJustRE) || hi.grepTalks.get(msg.talker)) {
+					if((hi.hookAll && hi.displayJustRE) || (!hi.hookAll && hi.grepTalks.get(msg.talker).displayJustRE)) {
 						ContentValues values = (ContentValues) param.thisObject;
 						values.put("talker", HOOK_TALKER + msg.talker);
 					}

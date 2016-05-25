@@ -1,5 +1,10 @@
 package com.nv.fre;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.util.List;
+
 public class TalkSel {
 	public String talkName;
 	public String showName;
@@ -7,7 +12,12 @@ public class TalkSel {
 	public boolean displayJustRE = false;
     public int delay;
 
-	public TalkSel(String value) {
+    public TalkSel(String talkName, String showName) {
+        this.talkName = talkName;
+        this.showName = showName;
+    }
+
+    public TalkSel(String value) {
 		if(value == null) {
 			return;
 		}
@@ -63,5 +73,11 @@ public class TalkSel {
 		return true;
 	}
 	
-	
+	public static String listToString(List<TalkSel> talkSels) {
+        return new Gson().toJson(talkSels);
+    }
+
+    public static List<TalkSel> stringToList(String strTalks) {
+        return new Gson().fromJson(strTalks, new TypeToken<List<TalkSel>>() {}.getType());
+    }
 }

@@ -15,6 +15,7 @@ import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.ClickView;
 import com.nv.fre.MatchView;
 import com.nv.fre.utils.Utils;
@@ -90,7 +91,7 @@ public class ChattingMsgHook {
 			@Override
 			public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
 				if (param.args != null && param.args.length > 0 && param.args[0] != null) {
-					XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
+					if(BuildConfig.DEBUG) XposedBridge.log("setAdapter: " + param.thisObject.getClass().getName() + ", " + param.args[0].getClass().getName());
 				}
 			}
 		});
@@ -126,7 +127,7 @@ public class ChattingMsgHook {
             if (tv == null || !"领取红包".equals(tv.getText().toString())) {
                 return false;
             }
-//				XposedBridge.log("发现红包: " + curView.getClass().getName());
+            if(BuildConfig.DEBUG) XposedBridge.log("发现红包: " + curView.getClass().getName());
             ViewParent parent = (ViewParent) curView;
             while(parent.getParent() != null) {
                 parent = parent.getParent();
@@ -173,7 +174,7 @@ public class ChattingMsgHook {
                     if(flag.get()) {
                         return;
                     }
-//						XposedBridge.log("clickNewMsg: " + tv.getText().toString() + ", " + callback.getClass().getName() + ", " + curView.getClass().getName());
+                    if(BuildConfig.DEBUG) XposedBridge.log("clickNewMsg: " + tv.getText().toString() + ", " + callback.getClass().getName() + ", " + curView.getClass().getName());
                     callback.onClick(curView);
                 }
             }, 8000);
@@ -203,14 +204,14 @@ public class ChattingMsgHook {
                 }
                 hi.redEnvelopClickView.remove(hi.curMsgId);
                 hi.status = MMContext.STATUS_CLICK_RED_ENVELOPE_VIEW;
-//					XposedBridge.log("点击领取红包: " + hi.curMsgId);
+//					if(BuildConfig.DEBUG) XposedBridge.log("点击领取红包: " + hi.curMsgId);
                 // 点击领取红包
                 curClickView.clickCallback.onClick(curClickView.view);
                 hi.doneMsgIds.add(hi.curMsgId);
             }
         };
         public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-            if(!hi.allow) {
+            if(!hi.allow || !hi.canClickRE()) {
                 return;
             }
             final View view = (View) param.getResult();
@@ -226,7 +227,7 @@ public class ChattingMsgHook {
             inHook = false;
             Object item = adapter.getItem(pos);
             inHook = true;
-//				XposedBridge.log("getView getItem: " + item.getClass().getName());
+            if(BuildConfig.DEBUG) XposedBridge.log("getView getItem: " + item.getClass().getName());
             if (item == null || item.getClass() != msgClass) {
                 return;
             }
@@ -257,7 +258,7 @@ public class ChattingMsgHook {
                 // getView和clickRedEnvelopCallback都运行在主线程，getView会执行多次，
             }
             hi.redEnvelopClickView.put(msgId, hi.clickCallbackMap.get(view));
-//				XposedBridge.log("getView 发现可领取的红包: " + msgId);
+			if(BuildConfig.DEBUG) XposedBridge.log("getView 发现可领取的红包: " + msgId);
             if(!isRun.get()) {
                 hi.uiHandler.removeCallbacks(clickRedEnvelopCallback);
                 hi.uiHandler.post(clickRedEnvelopCallback);

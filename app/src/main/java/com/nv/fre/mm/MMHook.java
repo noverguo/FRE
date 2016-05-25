@@ -1,5 +1,6 @@
 package com.nv.fre.mm;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.Const;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.mm.itf.Checker;
@@ -8,6 +9,7 @@ import com.nv.fre.utils.PackageUtils;
 import com.nv.fre.utils.UUIDUtils;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import io.grpc.stub.StreamObserver;
 
@@ -34,14 +36,14 @@ public class MMHook implements IXposedHookLoadPackage {
 						GrpcServer.fuckMM(request, new StreamObserver<Fre.FuckReply>() {
 							@Override
 							public void onNext(Fre.FuckReply value) {
-//								XposedBridge.log("fuckMM onNext");
+								if(BuildConfig.DEBUG) XposedBridge.log("fuckMM onNext: " + value.allow);
 								hi.allow = value.allow;
 								checker.finish();
 							}
 
 							@Override
 							public void onError(Throwable t) {
-//								XposedBridge.log("fuckMM onError: " + t.getMessage());
+								if(BuildConfig.DEBUG) XposedBridge.log("fuckMM onError: " + t.getMessage());
 								checker.error();
 							}
 
@@ -60,7 +62,7 @@ public class MMHook implements IXposedHookLoadPackage {
 						GrpcServer.getHookClasses(req, new StreamObserver<Fre.GetHookClassesReply>() {
 							@Override
 							public void onNext(Fre.GetHookClassesReply rsp) {
-//								XposedBridge.log("getHookClasses onNext: " + rsp.hookClassesMap);
+								if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses onNext: " + rsp.hookClassesMap);
 								if(rsp.support) {
 									ConfuseValue.init(rsp.hookClassesMap);
 									try {
@@ -75,7 +77,7 @@ public class MMHook implements IXposedHookLoadPackage {
 
 							@Override
 							public void onError(Throwable t) {
-//								XposedBridge.log("getHookClasses onError");
+								if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses onError");
 								checker.error();
 							}
 

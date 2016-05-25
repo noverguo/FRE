@@ -2,6 +2,7 @@ package com.nv.fre.mm;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -19,6 +20,7 @@ import android.widget.ListView;
 import android.widget.RelativeLayout;
 
 import com.nv.fre.MatchView;
+import com.nv.fre.TalkSel;
 import com.nv.fre.utils.ReflectUtil;
 import com.nv.fre.utils.UUIDUtils;
 import com.nv.fre.utils.Utils;
@@ -69,7 +71,6 @@ public class CommunicationsHook {
     }
 
 	private MMContext hi;
-	Map<String, String> allTalks = new HashMap<String, String>();
 	HashMap<ListAdapter, ListView> listViewMap = new HashMap<ListAdapter, ListView>();
 	Class<?> conversationListViewClass;
 	Class<?> conversationAdapterClass;
@@ -104,7 +105,7 @@ public class CommunicationsHook {
                         return;
                     }
                 }
-//					XposedBridge.log("setAdapter: " + param.args[0].getClass().getName() + ": " + param.args[0]);
+//					if(BuildConfig.DEBUG) XposedBridge.log("setAdapter: " + param.args[0].getClass().getName() + ": " + param.args[0]);
                 listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
             }
         }
@@ -183,7 +184,7 @@ public class CommunicationsHook {
             final Integer pos = (Integer) param.args[0];
             ListAdapter adapter = (ListAdapter) param.thisObject;
             Object item = adapter.getItem(pos);
-//				XposedBridge.log("聊天室列表getView: " + adapter.getClass().getName() + ": " + adapter);
+//				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: " + adapter.getClass().getName() + ": " + adapter);
             if (item.getClass() != conversationItemClass) {
                 return;
             }
@@ -194,9 +195,10 @@ public class CommunicationsHook {
             }
             // 获得聊天室的名称
             String displayName = getDisplayName(view);
-            if (!allTalks.containsKey(userName)) {
-                allTalks.put(userName, displayName);
-                updateTalks();
+            if (!hi.grepTalks.containsKey(userName)) {
+                hi.grepTalks.put(userName, new TalkSel(userName, displayName));
+                hi.updateTalks();
+                postUploadTalkers();
             }
             synchronized (conversationViewPosMap) {
                 // 缓存聊天室列表
@@ -227,7 +229,7 @@ public class CommunicationsHook {
             if (msg == null || msg.talker == null) {
                 return;
             }
-//                XposedBridge.log("聊天室列表getView: " + userName + ", " + msg.talker);
+//                if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: " + userName + ", " + msg.talker);
             if (!userName.equals(msg.talker)) {
                 return;
             }
@@ -303,7 +305,7 @@ public class CommunicationsHook {
             final ListView conversationListView = (ListView) param.thisObject;
             if (param.args != null && param.args.length > 0 && param.args[0] != null) {
                 OnItemClickListener listener = (OnItemClickListener) param.args[0];
-//					 XposedBridge.log("setOnItemClickListener: " + listener);
+//					 if(BuildConfig.DEBUG) XposedBridge.log("setOnItemClickListener: " + listener);
                 Class<? extends OnItemClickListener> itemListenerClass = listener.getClass();
                 Method method = ReflectUtil.getMethod(itemListenerClass, "onItemClick");
                 if (method != null) {
@@ -320,7 +322,7 @@ public class CommunicationsHook {
                             // 点击进入聊天室后，需要记录下来
                             String userName = (String) usernameField.get(item);
                             hi.stayTalker = userName;
-//								XposedBridge.log("onItemClick: 进入聊天室2: " + hi.stayTalker + " status: " + hi.status + " stay: " + hi.stay + "  stayTalker: " + hi.stayTalker);
+//								if(BuildConfig.DEBUG) XposedBridge.log("onItemClick: 进入聊天室2: " + hi.stayTalker + " status: " + hi.status + " stay: " + hi.stay + "  stayTalker: " + hi.stayTalker);
                         }
 
                         ;
@@ -333,24 +335,6 @@ public class CommunicationsHook {
 		XposedHelpers.findAndHookMethod(AdapterView.class, "setOnItemClickListener", OnItemClickListener.class, itemClickMethodHook);
 	}
 
-	private Runnable updateToView = new Runnable() {
-		@Override
-		public void run() {
-			String[] values = new String[allTalks.size()];
-			int i = 0;
-			for (String key : allTalks.keySet()) {
-				values[i++] = key + "," + allTalks.get(key);
-			}
-			hi.context.sendBroadcast(new Intent(SettingReceiver.ACTION_TALKS).putExtra(SettingReceiver.KEY_TALKS, values));
-		}
-	};
-
-	private void updateTalks() {
-//		XposedBridge.log("updateTalks: " + allTalks);
-		postUploadTalkers();
-		hi.uiHandler.removeCallbacks(updateToView);
-		hi.uiHandler.postDelayed(updateToView, 1000);
-	}
 
 	private void postUploadTalkers() {
 		hi.bgHandler.removeCallbacks(uploadTalkersRunnable);
@@ -366,35 +350,35 @@ public class CommunicationsHook {
 	private Set<String> hasUploadTalkers = new HashSet<>();
 	private ConnectedHelper connectedHelper = new ConnectedHelper();
 	private void uploadTalks() {
-//		XposedBridge.log("uploadTalks: " + allTalks + ", " + Thread.currentThread().getName());
+//		if(BuildConfig.DEBUG) XposedBridge.log("uploadTalks: " + allTalks + ", " + Thread.currentThread().getName());
 		GrpcServer.initHostAndPort();
 
 		final Map<String, String> uploadTalkers = new HashMap<>();
-		for(String key : allTalks.keySet()) {
+		for(String key : hi.grepTalks.keySet()) {
 			if(!hasUploadTalkers.contains(key)) {
-				uploadTalkers.put(key, allTalks.get(key));
+				uploadTalkers.put(key, hi.grepTalks.get(key).showName);
 			}
 		}
 		if(uploadTalkers.isEmpty()) {
-//			XposedBridge.log("upload talker empty");
+//			if(BuildConfig.DEBUG) XposedBridge.log("upload talker empty");
 			connectedHelper.unregisterConnectedCheck(hi.context);
 			return;
 		}
 		Fre.UploadRequest request = new Fre.UploadRequest();
 		request.uuid = UUIDUtils.getUUID(hi.context);
 		request.talkers = uploadTalkers;
-//		XposedBridge.log("upload: " + uploadTalkers);
+//		if(BuildConfig.DEBUG) XposedBridge.log("upload: " + uploadTalkers);
 		GrpcServer.upload(request, new StreamObserver<Fre.EmptyReply>() {
 			@Override
 			public void onNext(Fre.EmptyReply value) {
-//				XposedBridge.log("upload onNext");
+//				if(BuildConfig.DEBUG) XposedBridge.log("upload onNext");
 				hasUploadTalkers.addAll(uploadTalkers.keySet());
 				connectedHelper.unregisterConnectedCheck(hi.context);
 			}
 
 			@Override
 			public void onError(Throwable t) {
-//				XposedBridge.log("upload onError: " + t.getMessage());
+//				if(BuildConfig.DEBUG) XposedBridge.log("upload onError: " + t.getMessage());
 				registerCheck();
 			}
 

@@ -18,7 +18,7 @@ public class AutoSendHook {
 				if (tv.getClass() != mmEditTextClass) {
 					return;
 				}
-//				XposedBridge.log("handleTextChanged: " + tv.getClass().getName());
+//				if(BuildConfig.DEBUG) XposedBridge.log("handleTextChanged: " + tv.getClass().getName());
 			}
 
 		});

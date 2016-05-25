@@ -18,7 +18,7 @@ public class MMChecker implements Checker {
         XposedHelpers.findAndHookMethod("com.tencent.mm.ui.LauncherUI", hi.classLoader, "onResume", new MM_MethodHook() {
             @Override
             public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-//                XposedBridge.log("allow: " + hi.allow + ", checking: " + checking + ", needCheck: " + needCheck);
+//                if(BuildConfig.DEBUG) XposedBridge.log("allow: " + hi.allow + ", checking: " + checking + ", needCheck: " + needCheck);
                 if(!hi.allow && !isChecking()) {
                     postCheckAllow();
                 }
@@ -67,10 +67,10 @@ public class MMChecker implements Checker {
     }
 
     private void check() {
-        //XposedBridge.log("fuckMM check");
+        //if(BuildConfig.DEBUG) XposedBridge.log("fuckMM check");
         checking = true;
         GrpcServer.initHostAndPort();
-//        XposedBridge.log("fuckMM check start");
+//        if(BuildConfig.DEBUG) XposedBridge.log("fuckMM check start");
         callback.run(this);
     }
 

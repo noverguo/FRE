@@ -14,6 +14,7 @@ import android.support.v7.widget.Toolbar;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -25,6 +26,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.Const;
 import com.nv.fre.FREApplication;
 import com.nv.fre.R;
@@ -33,7 +35,9 @@ import com.nv.fre.TalkSel;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.mm.MMContext;
 import com.nv.fre.receiver.CompleteReceiver;
+import com.nv.fre.receiver.MMSettingReceiver;
 import com.nv.fre.utils.PackageUtils;
+import com.nv.fre.utils.RxJavaUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -41,6 +45,7 @@ import java.util.List;
 import java.util.Set;
 
 import me.drakeet.materialdialog.MaterialDialog;
+import rx.functions.Action1;
 
 public class SettingActivity extends AppCompatActivity {
 	private static final String TAG = SettingActivity.class.getSimpleName();
@@ -94,14 +99,13 @@ public class SettingActivity extends AppCompatActivity {
 					cbHookSel.setText(R.string.hook_sel_all);
 					cbHookDisplay.setVisibility(View.VISIBLE);
 					llHookItems.setVisibility(View.GONE);
-					sendBroadcast(new Intent(MMContext.ACTION_TALKS).putExtra(MMContext.KEY_DISPLAY_ALL, cbHookDisplay.isChecked()));
 				} else {
 					cbHookSel.setText(R.string.hook_sel_some);
 					initHookItems();
 					cbHookDisplay.setVisibility(View.GONE);
 					llHookItems.setVisibility(View.VISIBLE);
 				}
-				Settings.setHookAll(isChecked);
+                onTalkerCheckedChanged();
 			}
 		});
 		cbHookSel.setChecked(Settings.isHookAll());
@@ -110,8 +114,7 @@ public class SettingActivity extends AppCompatActivity {
 		cbHookDisplay.setOnCheckedChangeListener(new OnCheckedChangeListener() {
 			@Override
 			public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
-				sendBroadcast(new Intent(MMContext.ACTION_TALKS).putExtra(MMContext.KEY_DISPLAY_ALL, isCheck));
-				Settings.setDisplayJustRE(isCheck);
+                onTalkerCheckedChanged();
 			}
 		});
 
@@ -134,6 +137,10 @@ public class SettingActivity extends AppCompatActivity {
 		}
 		checkUpdate();
 	}
+
+    private void setMMSetting() {
+        MMSettingReceiver.setSetting(getApplicationContext(), cbHookSel.isChecked(), cbHookDisplay.isChecked(), talkSels);
+    }
 
 	@Override
 	protected void onDestroy() {
@@ -158,140 +165,130 @@ public class SettingActivity extends AppCompatActivity {
 		FREApplication.getContext().startActivity(new Intent(FREApplication.getContext(), SettingActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(KEY_UNLOCK, true));
 	}
 
-	private List<TalkSel> talkSels = new ArrayList<TalkSel>();
+	private List<TalkSel> talkSels = new ArrayList<>();
 
 	private void initHookItems() {
 		llHookItems.removeAllViews();
-		String[] talks = Settings.getTalks();
-		if (talks == null) {
-			return;
-		}
-		talkSels.clear();
-		Set<String> grepSet = new HashSet<String>();
-		for (final String talk : talks) {
-			if (TextUtils.isEmpty(talk)) {
-				continue;
-			}
-			final TalkSel talkSel = new TalkSel(talk);
-			if(talkSel.talkName == null || grepSet.contains(talkSel.talkName)) {
-				continue;
-			}
-			grepSet.add(talkSel.talkName);
-			talkSels.add(talkSel);
-			LinearLayout ll = new LinearLayout(this);
-			ll.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-			ll.setOrientation(LinearLayout.HORIZONTAL);
-			CheckBox talkCheckItem = new CheckBox(this);
+		RxJavaUtils.io2AndroidMain(Settings.getTalks()).subscribe(new Action1<List<TalkSel>>() {
+            @Override
+            public void call(List<TalkSel> talks) {
+                if (talks == null) {
+                    return;
+                }
+                talkSels.clear();
+                Set<String> grepSet = new HashSet<>();
+                for (final TalkSel talkSel : talks) {
+                    if(talkSel.talkName == null || grepSet.contains(talkSel.talkName)) {
+                        continue;
+                    }
+                    grepSet.add(talkSel.talkName);
+                    talkSels.add(talkSel);
+                    LinearLayout ll = new LinearLayout(SettingActivity.this);
+                    ll.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    ll.setOrientation(LinearLayout.HORIZONTAL);
+                    CheckBox talkCheckItem = new CheckBox(SettingActivity.this);
 
-			final CheckBox talkerDisplayItem = new CheckBox(this);
-            final CheckBox delayCheckItem = new CheckBox(this);
-            final EditText delayEditItem = new EditText(this);
-            final TextView secTextView = new TextView(this);
-            final LinearLayout optionLayout = new LinearLayout(this);
-            optionLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            optionLayout.setOrientation(LinearLayout.HORIZONTAL);
-			ll.addView(talkCheckItem);
-            ll.addView(optionLayout);
-            optionLayout.addView(talkerDisplayItem);
-            optionLayout.addView(delayCheckItem);
-            optionLayout.addView(delayEditItem);
-            optionLayout.addView(secTextView);
+                    final CheckBox talkerDisplayItem = new CheckBox(SettingActivity.this);
+                    final CheckBox delayCheckItem = new CheckBox(SettingActivity.this);
+                    final EditText delayEditItem = new EditText(SettingActivity.this);
+                    final TextView secTextView = new TextView(SettingActivity.this);
+                    final LinearLayout optionLayout = new LinearLayout(SettingActivity.this);
+                    optionLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    optionLayout.setOrientation(LinearLayout.HORIZONTAL);
+                    ll.addView(talkCheckItem);
+                    ll.addView(optionLayout);
+                    optionLayout.addView(talkerDisplayItem);
+                    optionLayout.addView(delayCheckItem);
+                    optionLayout.addView(delayEditItem);
+                    optionLayout.addView(secTextView);
 
-			talkCheckItem.setText(TextUtils.isEmpty(talkSel.showName) ? talkSel.talkName : talkSel.showName);
-            talkCheckItem.setChecked(talkSel.check);
-			talkCheckItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-				@Override
-				public void onCheckedChanged(CompoundButton buttonView, final boolean isChecked) {
-					talkSel.check = isChecked;
-                    int visiable = isChecked ? View.VISIBLE : View.GONE;
-                    optionLayout.setVisibility(visiable);
-					onTalkerCheckedChanged();
-				}
-			});
-            optionLayout.setVisibility(talkSel.check ? View.VISIBLE : View.GONE);
+                    talkCheckItem.setText(TextUtils.isEmpty(talkSel.showName) ? talkSel.talkName : talkSel.showName);
+                    talkCheckItem.setChecked(talkSel.check);
+                    talkCheckItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+                        @Override
+                        public void onCheckedChanged(CompoundButton buttonView, final boolean isChecked) {
+                            talkSel.check = isChecked;
+                            int visiable = isChecked ? View.VISIBLE : View.GONE;
+                            optionLayout.setVisibility(visiable);
+                            onTalkerCheckedChanged();
+                        }
+                    });
+                    optionLayout.setVisibility(talkSel.check ? View.VISIBLE : View.GONE);
 
-			talkerDisplayItem.setText(R.string.hook_display_just_re);
-            talkerDisplayItem.setChecked(talkSel.displayJustRE);
-			talkerDisplayItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-				@Override
-				public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
-					talkSel.displayJustRE = isCheck;
-					onTalkerCheckedChanged();
-				}
-			});
+                    talkerDisplayItem.setText(R.string.hook_display_just_re);
+                    talkerDisplayItem.setChecked(talkSel.displayJustRE);
+                    talkerDisplayItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+                        @Override
+                        public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
+                            talkSel.displayJustRE = isCheck;
+                            onTalkerCheckedChanged();
+                        }
+                    });
 
 
-            delayCheckItem.setText(R.string.hook_delay_fuck);
-            delayCheckItem.setChecked(talkSel.delay > 0);
-            delayCheckItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-                @Override
-                public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
-                    int visiable = isCheck ? View.VISIBLE : View.GONE;
+                    delayCheckItem.setText(R.string.hook_delay_fuck);
+                    delayCheckItem.setChecked(talkSel.delay > 0);
+                    delayCheckItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+                        @Override
+                        public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
+                            int visiable = isCheck ? View.VISIBLE : View.GONE;
+                            delayEditItem.setVisibility(visiable);
+                            secTextView.setVisibility(visiable);
+
+                            if(isCheck) {
+                                delayEditItem.setText(talkSel.delay + "");
+                            } else {
+                                talkSel.delay = 0;
+                            }
+                            onTalkerCheckedChanged();
+                        }
+                    });
+                    int visiable = talkSel.delay > 0 ? View.VISIBLE : View.GONE;
                     delayEditItem.setVisibility(visiable);
                     secTextView.setVisibility(visiable);
-
-                    if(isCheck) {
+                    if(talkSel.delay > 0) {
                         delayEditItem.setText(talkSel.delay + "");
-                    } else {
-                        talkSel.delay = 0;
                     }
-                    onTalkerCheckedChanged();
+
+                    delayEditItem.addTextChangedListener(new TextWatcher() {
+                        @Override
+                        public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+                        }
+
+                        @Override
+                        public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+                        }
+
+                        @Override
+                        public void afterTextChanged(Editable editable) {
+                            try {
+                                talkSel.delay = Integer.parseInt(editable.toString());
+                            } catch (NumberFormatException e) {
+                                talkSel.delay = 0;
+                            }
+                            onTalkerCheckedChanged();
+                        }
+                    });
+
+                    secTextView.setText(R.string.delay_sec);
+
+
+                    llHookItems.addView(ll);
                 }
-            });
-            int visiable = talkSel.delay > 0 ? View.VISIBLE : View.GONE;
-            delayEditItem.setVisibility(visiable);
-            secTextView.setVisibility(visiable);
-            if(talkSel.delay > 0) {
-                delayEditItem.setText(talkSel.delay + "");
+                onTalkerCheckedChanged();
             }
-
-            delayEditItem.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
-                }
-
-                @Override
-                public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
-                }
-
-                @Override
-                public void afterTextChanged(Editable editable) {
-                    try {
-                        talkSel.delay = Integer.parseInt(editable.toString());
-                    } catch (NumberFormatException e) {
-                        talkSel.delay = 0;
-                    }
-                    onTalkerCheckedChanged();
-                }
-            });
-
-            secTextView.setText(R.string.delay_sec);
-
-
-			llHookItems.addView(ll);
-		}
-		onTalkerCheckedChanged();
+        });
 	}
 
 	Runnable talkerChangeRunnable = new Runnable(){
 		@Override
 		public void run() {
-			String[] saveValues = new String[talkSels.size()];
-			List<String> grepTalks = new ArrayList<String>();
-			for (int i = 0; i < saveValues.length; ++i) {
-				TalkSel curTalkSel = talkSels.get(i);
-				saveValues[i] = curTalkSel.toString();
-				if(curTalkSel.check) {
-					grepTalks.add(curTalkSel.talkName + ":" + curTalkSel.displayJustRE + ":" + curTalkSel.delay * 1000);
-				}
-			}
-			if(grepTalks.isEmpty()) {
-				grepTalks.add("null_name:true");
-			}
-			Settings.setTalks(saveValues);
-			sendBroadcast(new Intent(MMContext.ACTION_TALKS).putExtra(MMContext.KEY_TALKS, grepTalks.toArray(new String[grepTalks.size()])));
+            Settings.setHookAll(cbHookSel.isChecked());
+            Settings.setDisplayJustRE(cbHookDisplay.isChecked());
+			Settings.setTalks(talkSels);
+            setMMSetting();
 		}
 	};
 
@@ -347,7 +344,7 @@ public class SettingActivity extends AppCompatActivity {
 						downloadReq.setDescription(getString(R.string.app_name) + " 最新安装包");
 						long id = downloadManager.enqueue(downloadReq);
 						CompleteReceiver.setId(getApplicationContext(), id);
-//						Log.i(TAG, "应用ID: " + id);
+						if(BuildConfig.DEBUG) Log.i(TAG, "应用ID: " + id);
 						mMaterialDialog.dismiss();
 					}
 				})

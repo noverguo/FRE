@@ -6,10 +6,13 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.utils.ReflectUtil;
+import com.nv.fre.utils.Utils;
 
 import java.lang.reflect.Field;
 
+import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 public class RedEnvelopeHook {
@@ -58,20 +61,20 @@ public class RedEnvelopeHook {
         private long preMsgId = -1;
         @Override
         public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
-//							XposedBridge.log("红包界面：LuckyMoneyReceiveUI.e: " + hi.status + ", " + hi.isStarted() + ", " + hi.isStayInRoom());
-            if(!hi.isStarted() || preMsgId == hi.curMsgId) {
+//							if(BuildConfig.DEBUG) XposedBridge.log("红包界面：LuckyMoneyReceiveUI.e: " + hi.status + ", " + hi.isStarted() + ", " + hi.isStayInRoom());
+            if(!hi.isStarted() || preMsgId == hi.curMsgId || !hi.canClickRE()) {
                 return;
             }
             preMsgId = hi.curMsgId;
-            //XposedBridge.log("LuckyMoneyReceiveUI.e： 可以抢红包了");
+            if(BuildConfig.DEBUG) XposedBridge.log("LuckyMoneyReceiveUI.e： 可以抢红包了");
             // 1.0.1: ePT
             // 1.0.2: eVK
             Field field = ReflectUtil.getField(param.thisObject.getClass(), ConfuseValue.getConfuseName(ConfuseValue.KEY_RE_OPEN_BUTTON_FIELD));
-            //XposedBridge.log("getField： " + field.getName() + ", " + field.getType().getName() + ", " + param.thisObject.getClass().getName());
+            //if(BuildConfig.DEBUG) XposedBridge.log("getField： " + field.getName() + ", " + field.getType().getName() + ", " + param.thisObject.getClass().getName());
             field.setAccessible(true);
             Button btn = (Button) field.get(param.thisObject);
             if(btn.getVisibility() == View.VISIBLE) {
-                //XposedBridge.log("发现可点击红包: " + Utils.getPrintString(btn));
+                if(BuildConfig.DEBUG) XposedBridge.log("发现可点击红包: " + Utils.getPrintString(btn));
                 btn.performClick();
             }
 
@@ -82,7 +85,7 @@ public class RedEnvelopeHook {
             TextView textView = (TextView) field.get(param.thisObject);
             String value = textView.getText().toString();
             if(textView.getVisibility() == View.VISIBLE && ("超过1天未领取，红包已失效".equals(value) || "手慢了，红包派完了".equals(value))) {
-                //XposedBridge.log("发现领取不了的红包: " + Utils.getPrintString(textView));
+                if(BuildConfig.DEBUG) XposedBridge.log("发现领取不了的红包: " + Utils.getPrintString(textView));
                 // 1.0.1: ePU
                 // 1.0.2: eVL
                 field = ReflectUtil.getField(param.thisObject.getClass(), ConfuseValue.getConfuseName(ConfuseValue.KEY_RE_CLOSE_BUTTON_FIELD));
@@ -107,7 +110,7 @@ public class RedEnvelopeHook {
     MM_MethodHook closeDetailMethodHook = new MM_MethodHook() {
         @Override
         public void MM_afterHookedMethod(final MethodHookParam param) throws Throwable {
-//				XposedBridge.log("查看红包详情.");
+//				if(BuildConfig.DEBUG) XposedBridge.log("查看红包详情.");
             if(!hi.isStarted()) {
                 return;
             }

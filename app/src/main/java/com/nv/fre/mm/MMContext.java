@@ -1,7 +1,9 @@
 package com.nv.fre.mm;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -17,23 +19,26 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.support.v4.util.LongSparseArray;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.BaseAdapter;
 
 import com.nv.fre.BuildConfig;
 import com.nv.fre.ClickView;
+import com.nv.fre.TalkSel;
 import com.nv.fre.api.GrpcServer;
+import com.nv.fre.receiver.MMSettingReceiver;
+import com.nv.fre.receiver.SettingReceiver;
 import com.nv.fre.receiver.UnlockReceiver;
+import com.nv.fre.utils.RxJavaUtils;
+import com.nv.fre.utils.SizeUtils;
 
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
+import rx.functions.Action1;
 
 public class MMContext {
-	public static final String ACTION_TALKS = "com.nv.fre.mm.MMHook.ACTION_TALKS";
-	public static final String KEY_TALKS = "com.nv.fre.mm.MMHook.KEY_TALKS";
-	public static final String KEY_DISPLAY_ALL = "com.nv.fre.mm.MMHook.KEY_DISPLAY_ALL";
-	
 	public static final int STATUS_NOTHING = 0;
 	public static final int STATUS_START_ACTIVITY = 1;
 	public static final int STATUS_IN_ROOM = 2;
@@ -55,8 +60,8 @@ public class MMContext {
 	public Map<View, ClickView> clickCallbackMap = new HashMap<View, ClickView>();
 	public Set<Long> doneMsgIds = new HashSet<Long>();
 	public Set<Long> noDoRedEnvelopMsgIds = new HashSet<Long>();
-	public Map<String, Boolean> grepTalks = new HashMap<String, Boolean>();
-    public Map<String, Integer> delayTalks = new HashMap<String, Integer>();
+	public Map<String, TalkSel> grepTalks = new HashMap<>();
+    public boolean hookAll = true;
 	public boolean displayJustRE = true;
 	public BaseAdapter chattingListViewAdapter;
 	
@@ -71,29 +76,12 @@ public class MMContext {
 	public Handler uiHandler;
 	public Handler bgHandler;
 
-	private BroadcastReceiver talksReceiver = new BroadcastReceiver() {
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			if (ACTION_TALKS.equals(intent.getAction())) {
-				final String[] talks = intent.getStringArrayExtra(KEY_TALKS);
-				displayJustRE = intent.getBooleanExtra(KEY_DISPLAY_ALL, true);
-				MMSettings.setTalks(context, talks);
-				MMSettings.setDisplayAll(context, displayJustRE);
-				setTalksSetting(talks);
-
-			}
-		}
-	};
-
-	private void setTalksSetting(String[] talks) {
-		grepTalks.clear();
+	private void setTalksSetting(List<TalkSel> talks) {
 		if (talks != null) {
-			for(String talk : talks) {
-				String[] arr = talk.split(":");
-				grepTalks.put(arr[0], arr.length > 1 ? Boolean.parseBoolean(arr[1]) : true);
-                delayTalks.put(arr[0], arr.length > 2 ? Integer.parseInt(arr[2]) : 0);
+			for(TalkSel talk : talks) {
+				grepTalks.put(talk.talkName, talk);
 			}
-//            XposedBridge.log("setTalksSetting: " + grepTalks + " --> " + delayTalks);
+//            if(BuildConfig.DEBUG) XposedBridge.log("setTalksSetting: " + grepTalks + " --> " + delayTalks);
 		}
 	}
 
@@ -105,8 +93,17 @@ public class MMContext {
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				context = (Context) param.thisObject;
 				GrpcServer.init(context);
-				IntentFilter intentFilter = new IntentFilter(ACTION_TALKS);
-				context.registerReceiver(talksReceiver, intentFilter);
+                MMSettingReceiver.register(context, new MMSettingReceiver.Callback() {
+
+                    @Override
+                    public void onReceive(boolean bHookAll, boolean bDisplayJustRE, List<TalkSel> lTalkSels) {
+                        hookAll = bHookAll;
+                        displayJustRE = bDisplayJustRE;
+                        if (!SizeUtils.isEmpty(lTalkSels)) {
+                            setTalksSetting(lTalkSels);
+                        }
+                    }
+                });
 
 				IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
 				filter.addAction(Intent.ACTION_SCREEN_OFF);
@@ -120,11 +117,14 @@ public class MMContext {
 				callback.onCreate();
 
 				// 读取过滤信息
-				displayJustRE = MMSettings.isDisplayAll(context);
-				String[] talks = MMSettings.getTalks(context);
-				if (talks != null && talks.length > 0) {
-					setTalksSetting(talks);
-				}
+                hookAll = MMSettings.isHookAll(context);
+				displayJustRE = MMSettings.isDisplayJustRE(context);
+                List<TalkSel> talkSels = MMSettings.getTalks(context);
+                if (talkSels != null && talkSels.size() > 0) {
+                    setTalksSetting(talkSels);
+                    updateTalks();
+                }
+
 			}
 		});
 	}
@@ -136,7 +136,7 @@ public class MMContext {
 
 	// 开始去抢红包
 	private void startFuckRedEnvelop(final Msg msg) throws Exception {
-//		XposedBridge.log("startFuckRedEnvelop: " + allow + ", " + curMsgId + ", " + stay + ", " + status + ", " + stayTalker + ", " + msg.talker);
+		if(BuildConfig.DEBUG) XposedBridge.log("startFuckRedEnvelop: " + allow + ", " + curMsgId + ", " + stay + ", " + status + ", " + stayTalker + ", " + msg.talker);
 		if (!allow || isStarted() || msg == null) {
 			return;
 		}
@@ -171,7 +171,7 @@ public class MMContext {
 			if(curMsgId != -1) {
 				noDoRedEnvelopMsgIds.add(curMsgId);
 			}
-//			XposedBridge.log("红包领取失败： " + curMsgId);
+			if(BuildConfig.DEBUG) XposedBridge.log("红包领取失败： " + curMsgId);
 			end();
 		}
 	};
@@ -214,19 +214,23 @@ public class MMContext {
 	private void startActivity(final Msg msg) throws ClassNotFoundException, CanceledException {
 		if(UnlockReceiver.screenLock) {
 			// 解锁屏幕
-			context.sendBroadcast(new Intent(UnlockReceiver.ACTION_UNLOCK));
+            UnlockReceiver.unlock(context);
 		} else {
-			final Intent intent = new Intent(context, classLoader.loadClass("com.tencent.mm.ui.LauncherUI"));
-			intent.putExtra("talkerCount", 1);
-			intent.putExtra("nofification_type", "new_msg_nofification");
-			intent.putExtra("Intro_Bottle_unread_count", 0);
-			intent.putExtra("MainUI_User_Last_Msg_Type", msg.type);
-			intent.putExtra("Intro_Is_Muti_Talker", false);
-			intent.putExtra("Main_User",msg.talker);
+//			final Intent intent = new Intent(context, classLoader.loadClass("com.tencent.mm.ui.LauncherUI"));
+//			intent.putExtra("talkerCount", 1);
+//			intent.putExtra("nofification_type", "new_msg_nofification");
+//			intent.putExtra("Intro_Bottle_unread_count", 0);
+//			intent.putExtra("MainUI_User_Last_Msg_Type", msg.type);
+//			intent.putExtra("Intro_Is_Muti_Talker", false);
+//			intent.putExtra("Main_User",msg.talker);
+
+            final Intent intent = new Intent();
+            intent.setClassName("com.tencent.mm", "com.tencent.mm.ui.LauncherUI");
+
 			intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
 			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 			// intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//			XposedBridge.log("启动有红包的界面: " + msg.type + "  " + msg.talker + " status: " + status);
+			if(BuildConfig.DEBUG) XposedBridge.log("启动有红包的界面: " + msg.type + "  " + msg.talker + " status: " + status);
 			PendingIntent.getActivity(context, 4097, intent, PendingIntent.FLAG_UPDATE_CURRENT).send();
 		}
 	}
@@ -283,6 +287,19 @@ public class MMContext {
 		long key = redEnvelopMsgs.keyAt(redEnvelopMsgs.size()-1);
 		startFuckRedEnvelop(redEnvelopMsgs.get(key));
 	}
+
+    private Runnable updateToView = new Runnable() {
+        @Override
+        public void run() {
+            if(BuildConfig.DEBUG) XposedBridge.log("MMContext.updateToView: " + grepTalks);
+            SettingReceiver.updateTalks(context, new ArrayList<>(grepTalks.values()));
+        }
+    };
+
+    public void updateTalks() {
+        if(BuildConfig.DEBUG) XposedBridge.log("MMContext.updateTalks: " + grepTalks);
+        postDelayed(updateToView, 1000);
+    }
 	
 	public boolean isStarted() {
 		return allow && status != STATUS_NOTHING;
@@ -304,7 +321,11 @@ public class MMContext {
 		stay = STAY_IN_ROOM;
 	}
 
-	public static interface Callback {
+    public boolean canClickRE() {
+        return hookAll || (!TextUtils.isEmpty(stayTalker) && grepTalks.containsKey(stayTalker) && grepTalks.get(stayTalker).check);
+    }
+
+	public interface Callback {
 		void onCreate();
 	}
 }

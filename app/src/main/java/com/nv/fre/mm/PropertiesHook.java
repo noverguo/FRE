@@ -45,7 +45,7 @@ public class PropertiesHook {
 	UncaughtExceptionHandler justLogHanlder = new UncaughtExceptionHandler() {
 		@Override
 		public void uncaughtException(Thread paramThread, Throwable paramThrowable) {
-//			//XposedBridge.log("UncaughtExceptionHandler: " + paramThrowable);
+//			//if(BuildConfig.DEBUG) XposedBridge.log("UncaughtExceptionHandler: " + paramThrowable);
 		}
 	};
 	UncaughtExceptionHandler oldDefaultHandler;
@@ -146,7 +146,7 @@ public class PropertiesHook {
 					if(!Const.PACKAGE_NAME.equals(pi.packageName)) {
 						newPackageInfoList.add(pi);
 					} else {
-						//XposedBridge.log("PackageInfo be hook: " + Const.PACKAGE_NAME);
+						//if(BuildConfig.DEBUG) XposedBridge.log("PackageInfo be hook: " + Const.PACKAGE_NAME);
 					}
 				}
 				param.setResult(newPackageInfoList);
@@ -163,20 +163,20 @@ public class PropertiesHook {
 				for(ResolveInfo ri : resolveInfoList) {
 					if(ri.activityInfo != null) {
 						if (Const.PACKAGE_NAME.equals(ri.activityInfo.packageName)) {
-							//XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
 							continue;
 						}
 					}
 					if(ri.serviceInfo != null) {
 						if (Const.PACKAGE_NAME.equals(ri.serviceInfo.packageName)) {
-							//XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
 							continue;
 						}
 					}
 					if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
 						if (ri.providerInfo != null) {
 							if (Const.PACKAGE_NAME.equals(ri.providerInfo.packageName)) {
-								//XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
+								//if(BuildConfig.DEBUG) XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
 								continue;
 							}
 						}
@@ -248,7 +248,7 @@ public class PropertiesHook {
 							if(lines != null) {
 								for(String line : lines) {
 									if(line.contains("com.nv.fre")) {
-										//XposedBridge.log("shell exec be hook: " + Const.PACKAGE_NAME);
+										//if(BuildConfig.DEBUG) XposedBridge.log("shell exec be hook: " + Const.PACKAGE_NAME);
 										continue;
 									}
 									grepOut.write(line.getBytes("UTF-8"));
@@ -278,7 +278,7 @@ public class PropertiesHook {
 						if(!Const.PACKAGE_NAME.equals(ai.packageName)) {
 							newApplicationInfoList.add(ai);
 						} else {
-							//XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
 						}
 					}
 					param.setResult(newApplicationInfoList);
@@ -323,7 +323,7 @@ public class PropertiesHook {
 						if(!Const.PACKAGE_NAME.equals(pi.packageName)) {
 							newProviderInfoList.add(pi);
 						} else {
-							//XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
 						}
 					}
 					param.setResult(newProviderInfoList);
