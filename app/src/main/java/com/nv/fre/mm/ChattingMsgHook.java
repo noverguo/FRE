@@ -134,7 +134,7 @@ public class ChattingMsgHook {
             }
             hi.clickCallbackMap.put((View)parent, new ClickView(curView, clickCallback));
             final View keyView = (View) parent;
-            hi.postDelayed(new Runnable() {
+            hi.runOnUiDelayed(new Runnable() {
                 @Override
                 public void run() {
                     hi.clickCallbackMap.remove(keyView);
@@ -168,7 +168,7 @@ public class ChattingMsgHook {
                 });
             }
             preNewMsg = curNewMsg;
-            hi.postDelayed(new Runnable() {
+            hi.runOnUiDelayed(new Runnable() {
                 @Override
                 public void run() {
                     if(flag.get()) {

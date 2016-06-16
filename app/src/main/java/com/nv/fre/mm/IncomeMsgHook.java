@@ -55,7 +55,7 @@ public class IncomeMsgHook {
                     if (hi.hookAll) {
                         hi.start(msg);
                     } else {
-                        hi.postDelayed(new Runnable() {
+                        hi.runOnUiDelayed(new Runnable() {
                             @Override
                             public void run() {
                                 try {

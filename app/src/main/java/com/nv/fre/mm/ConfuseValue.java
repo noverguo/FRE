@@ -7,6 +7,7 @@ import java.util.Map;
  * Created by noverguo on 2016/1/29.
  */
 public class ConfuseValue {
+    public static final String VERSION_CODE = "VERSION_CODE";
     public static final String KEY_MSG_MODEL_CLASS = "KEY_MSG_MODEL_CLASS";
     public static final String KEY_MSG_ADAPTER_CLASS = "KEY_MSG_ADAPTER_CLASS";
     public static final String KEY_RE_OPEN_BUTTON_FIELD = "KEY_RE_OPEN_BUTTON_FIELD";
@@ -22,6 +23,7 @@ public class ConfuseValue {
     public static final String KEY_CONVERSATION_LIST_VIEW_CLASS = "KEY_CONVERSATION_LIST_VIEW_CLASS";
     public static final String KEY_CHATTING_WINDOW_CLASS = "KEY_CHATTING_WINDOW_CLASS";
     public static final String KEY_CONVERSATION_TEXTVIEW_CLASS = "KEY_CONVERSATION_TEXTVIEW_CLASS";
+    public static final String KEY_CONVERSATION_TEXTVIEW_CLASS_TEXT_FIELD = "KEY_CONVERSATION_TEXTVIEW_CLASS_TEXT_FIELD";
     public static final String KEY_LUCKY_MONEY_DETAIL_UI_CLASS = "KEY_LUCKY_MONEY_DETAIL_UI_CLASS";
     public static final String KEY_LUCKY_MONEY_RECEIVE_UI_CLASS = "KEY_LUCKY_MONEY_RECEIVE_UI_CLASS";
     public static final String KEY_LUCKY_MONEY_RECEIVE_UI_RE_SET_ONCLICK_METHOD = "KEY_LUCKY_MONEY_RECEIVE_UI_RE_SET_ONCLICK_METHOD";
@@ -43,6 +45,7 @@ public class ConfuseValue {
         sDefaultValue.put(KEY_CHATTING_WINDOW_CLASS, "com.tencent.mm.ui.chatting.ChattingUI$a");
         sDefaultValue.put(KEY_CONVERSATION_LIST_VIEW_CLASS, "com.tencent.mm.ui.conversation.ConversationOverscrollListView");
         sDefaultValue.put(KEY_CONVERSATION_TEXTVIEW_CLASS, "com.tencent.mm.ui.base.NoMeasuredTextView");
+        sDefaultValue.put(KEY_CONVERSATION_TEXTVIEW_CLASS_TEXT_FIELD, "mText");
         sDefaultValue.put(KEY_LUCKY_MONEY_DETAIL_UI_CLASS, "com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI");
         sDefaultValue.put(KEY_LUCKY_MONEY_RECEIVE_UI_CLASS, "com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI");
         sDefaultValue.put(KEY_LUCKY_MONEY_RECEIVE_UI_RE_SET_ONCLICK_METHOD, "e");

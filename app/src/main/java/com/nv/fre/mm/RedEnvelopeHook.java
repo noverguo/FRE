@@ -84,7 +84,7 @@ public class RedEnvelopeHook {
             field.setAccessible(true);
             TextView textView = (TextView) field.get(param.thisObject);
             String value = textView.getText().toString();
-            if(textView.getVisibility() == View.VISIBLE && ("超过1天未领取，红包已失效".equals(value) || "手慢了，红包派完了".equals(value))) {
+            if(textView.getVisibility() == View.VISIBLE && (value.contains("超过") || "手慢了，红包派完了".equals(value))) {
                 if(BuildConfig.DEBUG) XposedBridge.log("发现领取不了的红包: " + Utils.getPrintString(textView));
                 // 1.0.1: ePU
                 // 1.0.2: eVL

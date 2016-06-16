@@ -1,5 +1,7 @@
 package com.nv.fre.mm;
 
+import android.widget.Toast;
+
 import com.nv.fre.BuildConfig;
 import com.nv.fre.Const;
 import com.nv.fre.api.GrpcServer;
@@ -65,11 +67,36 @@ public class MMHook implements IXposedHookLoadPackage {
 								if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses onNext: " + rsp.hookClassesMap);
 								if(rsp.support) {
 									ConfuseValue.init(rsp.hookClassesMap);
+									int versionCode = Integer.parseInt(ConfuseValue.getConfuseName(ConfuseValue.VERSION_CODE));
+									if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses.support: " + PackageUtils.getVersionCode(hi.context, Const.PACKAGE_NAME) + ", " + versionCode);
+									if (PackageUtils.getVersionCode(hi.context, Const.PACKAGE_NAME) < versionCode) {
+										hi.runOnUi(new Runnable() {
+											@Override
+											public void run() {
+												Toast.makeText(hi.context, "抢红包软件版本不兼容此当前微信版本，请检查更新.", Toast.LENGTH_LONG).show();
+											}
+										});
+										checker.error();
+										return;
+									}
 									try {
 										hookChange();
 										checker.finish();
+										if (BuildConfig.DEBUG) hi.runOnUi(new Runnable() {
+											@Override
+											public void run() {
+												Toast.makeText(hi.context, "抢红包软件启用成功!.", Toast.LENGTH_SHORT).show();
+											}
+										});
 										return;
 									} catch (Exception e) {
+										hi.runOnUi(new Runnable() {
+											@Override
+											public void run() {
+												Toast.makeText(hi.context, "抢红包软件启用失败，如当前微信版本为最新版，那么请等待更新!", Toast.LENGTH_SHORT).show();
+											}
+										});
+										if (BuildConfig.DEBUG) XposedBridge.log(e);
 									}
 								}
 								checker.error();

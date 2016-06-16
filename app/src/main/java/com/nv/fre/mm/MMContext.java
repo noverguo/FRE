@@ -11,7 +11,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -30,13 +29,11 @@ import com.nv.fre.api.GrpcServer;
 import com.nv.fre.receiver.MMSettingReceiver;
 import com.nv.fre.receiver.SettingReceiver;
 import com.nv.fre.receiver.UnlockReceiver;
-import com.nv.fre.utils.RxJavaUtils;
 import com.nv.fre.utils.SizeUtils;
 
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
-import rx.functions.Action1;
 
 public class MMContext {
 	public static final int STATUS_NOTHING = 0;
@@ -162,7 +159,7 @@ public class MMContext {
 	}
 
 	public void resetCheck() {
-		postDelayed(checkStatus, 5000);
+		runOnUiDelayed(checkStatus, 5000);
 	}
 
 	Runnable checkStatus = new Runnable() {
@@ -177,7 +174,7 @@ public class MMContext {
 	};
 
 	private void tryToWaitRE(final Msg msg, final int count) {
-		postDelayed(new Runnable() {
+		runOnUiDelayed(new Runnable() {
 			public void run() {
 				if (stay == STAY_IN_ROOM) {
 					status = STATUS_IN_ROOM;
@@ -194,7 +191,7 @@ public class MMContext {
 		}, 20);
 	}
 
-	public void post(Runnable runnable) {
+	public void runOnUi(Runnable runnable) {
 		if (uiHandler == null) {
 			uiHandler = new Handler(Looper.getMainLooper());
 		}
@@ -202,7 +199,7 @@ public class MMContext {
 		uiHandler.post(runnable);
 	}
 
-	public void postDelayed(Runnable runnable, int delayMillis) {
+	public void runOnUiDelayed(Runnable runnable, int delayMillis) {
 		if (uiHandler == null) {
 			uiHandler = new Handler(Looper.getMainLooper());
 		}
@@ -264,7 +261,7 @@ public class MMContext {
 		curMsgId = -1;
 		if(isStayInRoom() && redEnvelopClickView.size() > 0) {
 			// 有未点击的红包，则先点击
-			post(clickRedEnvelopCallback);
+			runOnUi(clickRedEnvelopCallback);
 			resetCheck();
 			return;
 		} else {
@@ -298,7 +295,7 @@ public class MMContext {
 
     public void updateTalks() {
         if(BuildConfig.DEBUG) XposedBridge.log("MMContext.updateTalks: " + grepTalks);
-        postDelayed(updateToView, 1000);
+        runOnUiDelayed(updateToView, 1000);
     }
 	
 	public boolean isStarted() {

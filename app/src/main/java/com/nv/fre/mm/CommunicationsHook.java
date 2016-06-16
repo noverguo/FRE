@@ -2,14 +2,12 @@ package com.nv.fre.mm;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import android.content.Intent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -19,6 +17,7 @@ import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 
+import com.nv.fre.BuildConfig;
 import com.nv.fre.MatchView;
 import com.nv.fre.TalkSel;
 import com.nv.fre.utils.ReflectUtil;
@@ -26,7 +25,6 @@ import com.nv.fre.utils.UUIDUtils;
 import com.nv.fre.utils.Utils;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.nano.Fre;
-import com.nv.fre.receiver.SettingReceiver;
 import com.nv.fre.utils.ConnectedHelper;
 
 import de.robv.android.xposed.XposedBridge;
@@ -77,7 +75,7 @@ public class CommunicationsHook {
 	Class<?> conversationItemClass;
 	Field usernameField;
 	Class<?> textViewClass;
-	Method getTextMethod;
+	Field textField;
 
 	private void init() throws Exception {
 		conversationListViewClass = hi.classLoader.loadClass(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_LIST_VIEW_CLASS));
@@ -85,7 +83,11 @@ public class CommunicationsHook {
 		conversationItemClass = hi.classLoader.loadClass(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_ITEM_CLASS));
 		usernameField = conversationItemClass.getField(ConfuseValue.getConfuseName(ConfuseValue.KEY_USERNAME_FIELD));
 		textViewClass = hi.classLoader.loadClass(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_TEXTVIEW_CLASS));
-		getTextMethod = textViewClass.getMethod("getText", new Class<?>[0]);
+		// 800后没有了getText方法.
+//		getTextMethod = textViewClass.getMethod("getText", new Class<?>[0]);
+		textField = textViewClass.getDeclaredField(ConfuseValue.getConfuseName(ConfuseValue.KEY_CONVERSATION_TEXTVIEW_CLASS_TEXT_FIELD));
+		textField.setAccessible(true);
+
 
 		Iterator<Map.Entry<ListAdapter, ListView>> iter = listViewMap.entrySet().iterator();
 		while(iter.hasNext()) {
@@ -100,12 +102,13 @@ public class CommunicationsHook {
         @Override
         public void MM_beforeHookedMethod(MethodHookParam param) throws Throwable {
             if (param.args != null && param.args.length > 0 && param.args[0] != null) {
-                if(conversationListViewClass != null && conversationAdapterClass != null) {
-                    if (param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
+				if(BuildConfig.DEBUG) XposedBridge.log("setAdapter: " + param.thisObject.getClass() + ": " + param.args[0].getClass().getName());
+				if(conversationListViewClass != null && conversationAdapterClass != null) {
+					if (param.thisObject.getClass() != conversationListViewClass || param.args[0].getClass() != conversationAdapterClass) {
                         return;
                     }
                 }
-//					if(BuildConfig.DEBUG) XposedBridge.log("setAdapter: " + param.args[0].getClass().getName() + ": " + param.args[0]);
+				if(BuildConfig.DEBUG) XposedBridge.log("setAdapter: " + param.args[0].getClass().getName() + ": " + param.args[0]);
                 listViewMap.put((ListAdapter) param.args[0], (ListView) param.thisObject);
             }
         }
@@ -169,7 +172,7 @@ public class CommunicationsHook {
         @Override
         public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
             // 有可能getView没被重新触发，这时可以用旧的view去点
-            hi.postDelayed(tryClickOldView, 300);
+            hi.runOnUiDelayed(tryClickOldView, 300);
         }
     };
     MM_MethodHook getViewMethodHook = new MM_MethodHook() {
@@ -184,17 +187,20 @@ public class CommunicationsHook {
             final Integer pos = (Integer) param.args[0];
             ListAdapter adapter = (ListAdapter) param.thisObject;
             Object item = adapter.getItem(pos);
-//				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: " + adapter.getClass().getName() + ": " + adapter);
+			if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: " + adapter.getClass().getName() + ", " + item.getClass().getName() + ", " + conversationItemClass.getName());
             if (item.getClass() != conversationItemClass) {
+				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView1: " + item.getClass() + " != " + conversationItemClass.getName());
                 return;
             }
             conversationAdapter = adapter;
             String userName = (String) usernameField.get(item);
             if (userName == null) {
+				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView2: userName == null");
                 return;
             }
             // 获得聊天室的名称
             String displayName = getDisplayName(view);
+			if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: displayName: " + displayName);
             if (!hi.grepTalks.containsKey(userName)) {
                 hi.grepTalks.put(userName, new TalkSel(userName, displayName));
                 hi.updateTalks();
@@ -206,7 +212,7 @@ public class CommunicationsHook {
                     conversationViewPosMap.clear();
                     init = true;
                     // 设置过期
-                    hi.postDelayed(new Runnable() {
+                    hi.runOnUiDelayed(new Runnable() {
                         @Override
                         public void run() {
                             if(init) {
@@ -222,14 +228,16 @@ public class CommunicationsHook {
             }
             long cur = hi.curMsgId << 16 + pos;
             if (cur == pre) {
+				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView3: " + cur + " != " + pre);
                 return;
             }
 
             Msg msg = hi.allMsgs.get(hi.curMsgId);
             if (msg == null || msg.talker == null) {
+				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView4: " + msg + ", " + msg == null ? "" : msg.talker);
                 return;
             }
-//                if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: " + userName + ", " + msg.talker);
+			if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: " + userName + ", " + msg.talker);
             if (!userName.equals(msg.talker)) {
                 return;
             }
@@ -240,17 +248,17 @@ public class CommunicationsHook {
         }
 
         private String getDisplayName(View view) throws Exception {
-            if (textViewClass != null && getTextMethod != null) {
-                View displayView = Utils.getChild(groupViewMatchViews, view);
-                if (displayView != null) {
-                    if (displayView.getClass() == textViewClass) {
-                        Object res = getTextMethod.invoke(displayView, new Object[0]);
-                        if (res != null) {
-                            return res.toString();
-                        }
-                    }
-                }
-            }
+			if (textViewClass != null && textField != null) {
+				View displayView = Utils.getChild(groupViewMatchViews, view);
+				if (displayView != null) {
+					if (displayView.getClass() == textViewClass) {
+						Object res = textField.get(displayView);
+						if (res != null) {
+							return res.toString();
+						}
+					}
+				}
+			}
             return "";
         }
     };
@@ -272,6 +280,7 @@ public class CommunicationsHook {
 	private boolean enterChatting() {
 		Msg msg = hi.allMsgs.get(hi.curMsgId);
 		if (msg == null || msg.talker == null) {
+
 			return false;
 		}
 		if (hi.canFuck() && msg.talker.equals(hi.stayTalker)) {
@@ -322,10 +331,8 @@ public class CommunicationsHook {
                             // 点击进入聊天室后，需要记录下来
                             String userName = (String) usernameField.get(item);
                             hi.stayTalker = userName;
-//								if(BuildConfig.DEBUG) XposedBridge.log("onItemClick: 进入聊天室2: " + hi.stayTalker + " status: " + hi.status + " stay: " + hi.stay + "  stayTalker: " + hi.stayTalker);
+							if(BuildConfig.DEBUG) XposedBridge.log("onItemClick: 进入聊天室2: " + hi.stayTalker + " status: " + hi.status + " stay: " + hi.stay + "  stayTalker: " + hi.stayTalker);
                         }
-
-                        ;
                     });
                 }
             }

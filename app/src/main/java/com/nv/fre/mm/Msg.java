@@ -14,7 +14,8 @@ public class Msg {
 		talker = values.getAsString("talker");
 		content = values.getAsString("content");
 		type = values.getAsInteger("type");
-		isSend = values.getAsInteger("isSend") == 1;
+		Integer isSend = values.getAsInteger("isSend");
+		this.isSend = isSend != null && isSend == 1;
 	}
 	
 	@Override
