@@ -11,6 +11,7 @@ public class TalkSel {
 	public boolean check;
 	public boolean displayJustRE = false;
     public int delay;
+	public boolean hideNotification = false;
 
     public TalkSel(String talkName, String showName) {
         this.talkName = talkName;
@@ -28,6 +29,9 @@ public class TalkSel {
 				displayJustRE = Boolean.valueOf(arr[2]);
                 if(arr.length > 3) {
                     delay = Integer.parseInt(arr[3]);
+					if (arr.length > 4) {
+						hideNotification = Boolean.valueOf(arr[4]);
+					}
                 }
 			}
 		}
@@ -40,7 +44,7 @@ public class TalkSel {
 
 	@Override
 	public String toString() {
-		return talkName + (showName == null ? "" : ("," + showName)) + ":" + check + ":" + displayJustRE + ":" + delay;
+		return talkName + (showName == null ? "" : ("," + showName)) + ":" + check + ":" + displayJustRE + ":" + delay + ":" + hideNotification;
 	}
 
 	@Override

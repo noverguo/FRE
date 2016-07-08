@@ -3,6 +3,7 @@ package com.nv.fre.mm;
 import android.content.ContentValues;
 
 import com.nv.fre.BuildConfig;
+import com.nv.fre.TalkSel;
 
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
@@ -48,14 +49,14 @@ public class IncomeMsgHook {
 				if (!hi.hookAll && (!hi.grepTalks.containsKey(msg.talker) || !hi.grepTalks.get(msg.talker).check)) {
 					return;
 				}
-				
-				String content = msg.content;
-				if (content.contains("领取红包") && content.contains("微信红包") && content.contains("查看红包")) {
+
+				if (msg.isRE) {
                     if(BuildConfig.DEBUG) XposedBridge.log("发现红包: " + msg.talker + ": " + hi.grepTalks);
                     if (hi.hookAll) {
                         hi.start(msg);
                     } else {
-                        hi.runOnUiDelayed(new Runnable() {
+						TalkSel talkSel = hi.grepTalks.get(msg.talker);
+						hi.runOnUiDelayed(new Runnable() {
                             @Override
                             public void run() {
                                 try {
@@ -63,14 +64,21 @@ public class IncomeMsgHook {
                                 } catch (Exception e) {
                                 }
                             }
-                        }, hi.grepTalks.get(msg.talker).delay * 1000);
+                        }, talkSel.delay * 1000);
                     }
-				} else {
-					// 如果需要只显示红包，则把消息改掉
-					if((hi.hookAll && hi.displayJustRE) || (!hi.hookAll && hi.grepTalks.get(msg.talker).displayJustRE)) {
-						ContentValues values = (ContentValues) param.thisObject;
-						values.put("talker", HOOK_TALKER + msg.talker);
-					}
+					return;
+				}
+
+				// 如果需要只显示红包，则把消息改掉
+				if((hi.hookAll && hi.displayJustRE) || (!hi.hookAll && hi.grepTalks.get(msg.talker).displayJustRE)) {
+					ContentValues values = (ContentValues) param.thisObject;
+					values.put("talker", HOOK_TALKER + msg.talker);
+				}
+
+				if (!hi.hookAll && hi.grepTalks.get(msg.talker).hideNotification) {
+					if (BuildConfig.DEBUG) XposedBridge.log("set disable vibrate");
+					// 设置震动禁用时间
+					hi.virbateDisableTime.set(System.currentTimeMillis() + 800);
 				}
 			}
 

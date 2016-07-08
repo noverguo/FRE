@@ -234,7 +234,7 @@ public class CommunicationsHook {
 
             Msg msg = hi.allMsgs.get(hi.curMsgId);
             if (msg == null || msg.talker == null) {
-				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView4: " + msg + ", " + msg == null ? "" : msg.talker);
+				if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView4: " + (msg == null ? "" : msg.talker));
                 return;
             }
 			if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: " + userName + ", " + msg.talker);

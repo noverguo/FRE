@@ -7,8 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicLong;
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.content.Context;
@@ -46,6 +48,8 @@ public class MMContext {
 	public static final int STAY_IN_ROOM = 1;
 	public boolean allow;
 	public int stay = STAY_UNKNOW;
+    public AtomicLong virbateDisableTime = new AtomicLong(0);
+    public AtomicLong soundDisableTime = new AtomicLong(0);
 	
 	public ClassLoader classLoader;
 	public Context context;
@@ -75,17 +79,29 @@ public class MMContext {
 
 	private void setTalksSetting(List<TalkSel> talks) {
 		if (talks != null) {
+			grepTalks.clear();
 			for(TalkSel talk : talks) {
 				grepTalks.put(talk.talkName, talk);
 			}
-//            if(BuildConfig.DEBUG) XposedBridge.log("setTalksSetting: " + grepTalks + " --> " + delayTalks);
+            if(BuildConfig.DEBUG) XposedBridge.log("setTalksSetting: " + grepTalks);
 		}
 	}
 
 	public void init(final LoadPackageParam lpparam, final Callback callback) {
 		this.classLoader = lpparam.classLoader;
+		String applicationClass = lpparam.appInfo.className;
+		if (applicationClass == null) {
+			applicationClass = Application.class.getName();
+		} else {
+			try {
+				XposedHelpers.findMethodExact(applicationClass, lpparam.classLoader, "onCreate");
+			} catch (NoSuchMethodError e) {
+				applicationClass = Application.class.getName();
+			}
+		}
+		if (BuildConfig.DEBUG) XposedBridge.log("fre init: " + applicationClass + ".onCreate");
 		// hook Application.onCreate
-		XposedHelpers.findAndHookMethod("com.tencent.mm.app.MMApplication", classLoader, "onCreate", new MM_MethodHook() {
+		XposedHelpers.findAndHookMethod(applicationClass, classLoader, "onCreate", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
 				context = (Context) param.thisObject;

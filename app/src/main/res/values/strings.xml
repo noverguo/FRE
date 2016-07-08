@@ -5,6 +5,7 @@
 	<string name="hook_display_all">显示全部消息</string>
 	<string name="hook_display_just_re">只显示红包</string>
     <string name="hook_delay_fuck">延时</string>
+    <string name="hook_hide_notification">隐藏通知</string>
     <string name="delay_sec">秒</string>
 
 

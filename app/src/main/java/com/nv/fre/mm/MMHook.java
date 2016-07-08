@@ -104,6 +104,12 @@ public class MMHook implements IXposedHookLoadPackage {
 
 							@Override
 							public void onError(Throwable t) {
+								hi.runOnUi(new Runnable() {
+									@Override
+									public void run() {
+										Toast.makeText(hi.context, "抢红包软件启用失败，请检查网络连接!", Toast.LENGTH_SHORT).show();
+									}
+								});
 								if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses onError");
 								checker.error();
 							}
@@ -128,6 +134,9 @@ public class MMHook implements IXposedHookLoadPackage {
 		PropertiesHook.hookPreventCheck(hi);
 		// 固定不变的先hook
 		CommunicationsHook.hookNoChange(hi);
+		// 消息通知提醒处理
+		NotificationHook.hookNoChange(hi);
+		VibratorHook.hookNoChange(hi);
 	}
 
 	private void hookChange() throws Exception {

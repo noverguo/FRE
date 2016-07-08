@@ -89,7 +89,7 @@ public class MMChecker implements Checker {
                 registerCheck();
             }
         }, SUCCESS_DELAY_CHECK);
-        XposedBridge.log("MMChecker.finish(): " + SUCCESS_DELAY_CHECK);
+        if (BuildConfig.DEBUG) XposedBridge.log("MMChecker.finish(): " + SUCCESS_DELAY_CHECK);
     }
 
     // 出错后10分钟后重试
