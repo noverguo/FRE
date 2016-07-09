@@ -65,7 +65,6 @@ public class RedEnvelopeHook {
 				if(!hi.isStarted() || preMsgId == hi.curMsgId) {
 					return;
 				}
-				preMsgId = hi.curMsgId;
 				//XposedBridge.log("LuckyMoneyReceiveUI.e： 可以抢红包了");
 				// 1.0.1: ePT
 				// 1.0.2: eVK
@@ -75,6 +74,7 @@ public class RedEnvelopeHook {
 				Button btn = (Button) field.get(param.thisObject);
 				if(btn.getVisibility() == View.VISIBLE) {
 					//XposedBridge.log("发现可点击红包: " + Utils.getPrintString(btn));
+					preMsgId = hi.curMsgId;
 					btn.performClick();
 				}
 
