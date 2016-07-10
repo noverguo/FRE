@@ -12,6 +12,7 @@ public class ConfuseValue {
     public static final String KEY_MSG_ADAPTER_CLASS = "KEY_MSG_ADAPTER_CLASS";
     public static final String KEY_RE_OPEN_BUTTON_FIELD = "KEY_RE_OPEN_BUTTON_FIELD";
     public static final String KEY_RE_INFO_TEXTVIEW_FIELD = "KEY_RE_INFO_TEXTVIEW_FIELD";
+    // ImageView
     public static final String KEY_RE_CLOSE_BUTTON_FIELD = "KEY_RE_CLOSE_BUTTON_FIELD";
 
     // 有默认值的
