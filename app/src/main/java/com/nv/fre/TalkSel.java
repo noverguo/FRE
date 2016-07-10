@@ -1,17 +1,39 @@
 package com.nv.fre;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.util.List;
+
 public class TalkSel {
 	public String talkName;
 	public String showName;
 	public boolean check;
+	public boolean displayJustRE = false;
+    public int delay;
+	public boolean hideNotification = false;
 
-	public TalkSel(String value) {
+    public TalkSel(String talkName, String showName) {
+        this.talkName = talkName;
+        this.showName = showName;
+    }
+
+    public TalkSel(String value) {
 		if(value == null) {
 			return;
 		}
 		String[] arr = value.split(":");
 		if(arr.length > 1) {
 			check = Boolean.valueOf(arr[1]);
+			if(arr.length > 2) {
+				displayJustRE = Boolean.valueOf(arr[2]);
+                if(arr.length > 3) {
+                    delay = Integer.parseInt(arr[3]);
+					if (arr.length > 4) {
+						hideNotification = Boolean.valueOf(arr[4]);
+					}
+                }
+			}
 		}
 		String[] strings = arr[0].split(",");
 		talkName = strings[0];
@@ -22,7 +44,7 @@ public class TalkSel {
 
 	@Override
 	public String toString() {
-		return talkName + (showName == null ? "" : ("," + showName)) + ":" + check;
+		return talkName + (showName == null ? "" : ("," + showName)) + ":" + check + ":" + displayJustRE + ":" + delay + ":" + hideNotification;
 	}
 
 	@Override
@@ -55,5 +77,11 @@ public class TalkSel {
 		return true;
 	}
 	
-	
+	public static String listToString(List<TalkSel> talkSels) {
+        return new Gson().toJson(talkSels);
+    }
+
+    public static List<TalkSel> stringToList(String strTalks) {
+        return new Gson().fromJson(strTalks, new TypeToken<List<TalkSel>>() {}.getType());
+    }
 }

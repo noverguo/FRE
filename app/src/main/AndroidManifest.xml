@@ -48,14 +48,14 @@
             android:name="com.nv.fre.receiver.SettingReceiver"
             android:exported="true" >
             <intent-filter>
-                <action android:name="com.nv.fuckredenvelope.receiver.SettingReceiver" />
+                <action android:name="com.nv.fre.receiver.SettingReceiver.ACTION_TALKS" />
             </intent-filter>
         </receiver>
         <receiver
             android:name="com.nv.fre.receiver.UnlockReceiver"
             android:exported="true" >
             <intent-filter>
-                <action android:name="com.nv.fuckredenvelope.receiver.UnlockReceiver" />
+                <action android:name="com.nv.fre.receiver.UnlockReceiver.ACTION_UNLOCK" />
             </intent-filter>
         </receiver>
         <receiver android:name=".receiver.CompleteReceiver">

@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 public class PropertiesHook {
@@ -36,7 +35,7 @@ public class PropertiesHook {
 	 * 
 	 * @param hi
 	 */
-	public static void hookPreventCheck(HookInfo hi) {
+	public static void hookPreventCheck(MMContext hi) {
 		PropertiesHook ph = new PropertiesHook();
 		ph.hookUnableUploadException(hi);
 		ph.hookReadImeiAndImsi(hi);
@@ -46,7 +45,7 @@ public class PropertiesHook {
 	UncaughtExceptionHandler justLogHanlder = new UncaughtExceptionHandler() {
 		@Override
 		public void uncaughtException(Thread paramThread, Throwable paramThrowable) {
-//			//XposedBridge.log("UncaughtExceptionHandler: " + paramThrowable);
+//			//if(BuildConfig.DEBUG) XposedBridge.log("UncaughtExceptionHandler: " + paramThrowable);
 		}
 	};
 	UncaughtExceptionHandler oldDefaultHandler;
@@ -56,7 +55,7 @@ public class PropertiesHook {
 	 * 
 	 * @param hi
 	 */
-	private void hookUnableUploadException(HookInfo hi) {
+	private void hookUnableUploadException(MMContext hi) {
 		XposedHelpers.findAndHookMethod(Thread.class, "setDefaultUncaughtExceptionHandler", UncaughtExceptionHandler.class, new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
@@ -121,7 +120,7 @@ public class PropertiesHook {
 	 * 
 	 * @param hi
 	 */
-	private void hookReadImeiAndImsi(HookInfo hi) {
+	private void hookReadImeiAndImsi(MMContext hi) {
 		// 1）获取运营商sim卡imsi号：
 		// String android_imsi = telephonyManager.getSubscriberId();//获取手机IMSI号
 		// String IMSI =
@@ -147,7 +146,7 @@ public class PropertiesHook {
 					if(!Const.PACKAGE_NAME.equals(pi.packageName)) {
 						newPackageInfoList.add(pi);
 					} else {
-						//XposedBridge.log("PackageInfo be hook: " + Const.PACKAGE_NAME);
+						//if(BuildConfig.DEBUG) XposedBridge.log("PackageInfo be hook: " + Const.PACKAGE_NAME);
 					}
 				}
 				param.setResult(newPackageInfoList);
@@ -164,20 +163,20 @@ public class PropertiesHook {
 				for(ResolveInfo ri : resolveInfoList) {
 					if(ri.activityInfo != null) {
 						if (Const.PACKAGE_NAME.equals(ri.activityInfo.packageName)) {
-							//XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
 							continue;
 						}
 					}
 					if(ri.serviceInfo != null) {
 						if (Const.PACKAGE_NAME.equals(ri.serviceInfo.packageName)) {
-							//XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
 							continue;
 						}
 					}
 					if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
 						if (ri.providerInfo != null) {
 							if (Const.PACKAGE_NAME.equals(ri.providerInfo.packageName)) {
-								//XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
+								//if(BuildConfig.DEBUG) XposedBridge.log("ResolveInfo be hook: " + Const.PACKAGE_NAME);
 								continue;
 							}
 						}
@@ -193,7 +192,7 @@ public class PropertiesHook {
 	 * 禁止读到当前应用
 	 * @param hi
      */
-	private void hookReadPackage(HookInfo hi) {
+	private void hookReadPackage(MMContext hi) {
 		XposedHelpers.findAndHookMethod(ContextWrapper.class, "getPackageManager", new MM_MethodHook() {
 			private boolean init = false;
 			@Override
@@ -249,7 +248,7 @@ public class PropertiesHook {
 							if(lines != null) {
 								for(String line : lines) {
 									if(line.contains("com.nv.fre")) {
-										//XposedBridge.log("shell exec be hook: " + Const.PACKAGE_NAME);
+										//if(BuildConfig.DEBUG) XposedBridge.log("shell exec be hook: " + Const.PACKAGE_NAME);
 										continue;
 									}
 									grepOut.write(line.getBytes("UTF-8"));
@@ -279,7 +278,7 @@ public class PropertiesHook {
 						if(!Const.PACKAGE_NAME.equals(ai.packageName)) {
 							newApplicationInfoList.add(ai);
 						} else {
-							//XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
 						}
 					}
 					param.setResult(newApplicationInfoList);
@@ -324,7 +323,7 @@ public class PropertiesHook {
 						if(!Const.PACKAGE_NAME.equals(pi.packageName)) {
 							newProviderInfoList.add(pi);
 						} else {
-							//XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
+							//if(BuildConfig.DEBUG) XposedBridge.log("ApplicationInfo be hook: " + Const.PACKAGE_NAME);
 						}
 					}
 					param.setResult(newProviderInfoList);

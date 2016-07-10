@@ -1,5 +1,8 @@
 package com.nv.fre.mm;
 
+import android.widget.Toast;
+
+import com.nv.fre.BuildConfig;
 import com.nv.fre.Const;
 import com.nv.fre.api.GrpcServer;
 import com.nv.fre.mm.itf.Checker;
@@ -8,19 +11,20 @@ import com.nv.fre.utils.PackageUtils;
 import com.nv.fre.utils.UUIDUtils;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import io.grpc.stub.StreamObserver;
 
 public class MMHook implements IXposedHookLoadPackage {
-	HookInfo hi = new HookInfo();
+	MMContext hi = new MMContext();
 	MMChecker allowChecker = new MMChecker();
 	MMChecker hookClassesChecker = new MMChecker();
 	// 入口
 	public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
-		if (lpparam.isFirstApplication && !Const.MM_PACKAGE_NAME.equals(lpparam.packageName)) {
+		if (!lpparam.isFirstApplication || !Const.MM_PACKAGE_NAME.equals(lpparam.packageName)) {
 			return;
 		}
-		hi.init(lpparam, new HookInfo.Callback() {
+		hi.init(lpparam, new MMContext.Callback() {
 			@Override
 			public void onCreate() {
 				if(!lpparam.isFirstApplication) {
@@ -34,14 +38,14 @@ public class MMHook implements IXposedHookLoadPackage {
 						GrpcServer.fuckMM(request, new StreamObserver<Fre.FuckReply>() {
 							@Override
 							public void onNext(Fre.FuckReply value) {
-//								XposedBridge.log("fuckMM onNext");
+								if(BuildConfig.DEBUG) XposedBridge.log("fuckMM onNext: " + value.allow);
 								hi.allow = value.allow;
 								checker.finish();
 							}
 
 							@Override
 							public void onError(Throwable t) {
-//								XposedBridge.log("fuckMM onError: " + t.getMessage());
+								if(BuildConfig.DEBUG) XposedBridge.log("fuckMM onError: " + t.getMessage());
 								checker.error();
 							}
 
@@ -60,14 +64,39 @@ public class MMHook implements IXposedHookLoadPackage {
 						GrpcServer.getHookClasses(req, new StreamObserver<Fre.GetHookClassesReply>() {
 							@Override
 							public void onNext(Fre.GetHookClassesReply rsp) {
-//								XposedBridge.log("getHookClasses onNext: " + rsp.hookClassesMap);
+								if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses onNext: " + rsp.hookClassesMap);
 								if(rsp.support) {
-									HookClasses.init(rsp.hookClassesMap);
+									ConfuseValue.init(rsp.hookClassesMap);
+									int versionCode = Integer.parseInt(ConfuseValue.getConfuseName(ConfuseValue.VERSION_CODE));
+									if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses.support: " + PackageUtils.getVersionCode(hi.context, Const.PACKAGE_NAME) + ", " + versionCode);
+									if (PackageUtils.getVersionCode(hi.context, Const.PACKAGE_NAME) < versionCode) {
+										hi.runOnUi(new Runnable() {
+											@Override
+											public void run() {
+												Toast.makeText(hi.context, "抢红包软件版本不兼容此当前微信版本，请检查更新.", Toast.LENGTH_LONG).show();
+											}
+										});
+										checker.error();
+										return;
+									}
 									try {
 										hookChange();
 										checker.finish();
+										if (BuildConfig.DEBUG) hi.runOnUi(new Runnable() {
+											@Override
+											public void run() {
+												Toast.makeText(hi.context, "抢红包软件启用成功!.", Toast.LENGTH_SHORT).show();
+											}
+										});
 										return;
 									} catch (Exception e) {
+										hi.runOnUi(new Runnable() {
+											@Override
+											public void run() {
+												Toast.makeText(hi.context, "抢红包软件启用失败，如当前微信版本为最新版，那么请等待更新!", Toast.LENGTH_SHORT).show();
+											}
+										});
+										if (BuildConfig.DEBUG) XposedBridge.log(e);
 									}
 								}
 								checker.error();
@@ -75,7 +104,13 @@ public class MMHook implements IXposedHookLoadPackage {
 
 							@Override
 							public void onError(Throwable t) {
-//								XposedBridge.log("getHookClasses onError");
+								hi.runOnUi(new Runnable() {
+									@Override
+									public void run() {
+										Toast.makeText(hi.context, "抢红包软件启用失败，请检查网络连接!", Toast.LENGTH_SHORT).show();
+									}
+								});
+								if(BuildConfig.DEBUG) XposedBridge.log("getHookClasses onError");
 								checker.error();
 							}
 
@@ -99,13 +134,16 @@ public class MMHook implements IXposedHookLoadPackage {
 		PropertiesHook.hookPreventCheck(hi);
 		// 固定不变的先hook
 		CommunicationsHook.hookNoChange(hi);
+		// 消息通知提醒处理
+		NotificationHook.hookNoChange(hi);
+		VibratorHook.hookNoChange(hi);
 	}
 
 	private void hookChange() throws Exception {
 		// 启动窗口后，可能会停在消息列表窗口（具体原因待查），这时需要去点击进入对应的窗口
 		CommunicationsHook.hookClickChattingItem(hi);
 		// 注入红包相关点击事件
-		RedEnvelopeHook.hookRedEnvelopeClickListener(hi);
+		RedEnvelopeHook.hookOnResumeInit(hi);
 		// 检测消息的View，如发现有红包的View，则进行点击
 		ChattingMsgHook.hookMsgView(hi);
 		// 聊天UI的生命周期状态改变

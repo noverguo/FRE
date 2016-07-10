@@ -2,15 +2,20 @@ package com.nv.fre.mm;
 
 import android.content.ContentValues;
 
+import com.nv.fre.BuildConfig;
+import com.nv.fre.TalkSel;
+
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 public class IncomeMsgHook {
+
+	static final String HOOK_TALKER = "fre_hook_";
 	/**
 	 *  有新的消息
 	 * @param hi
 	 */
-	public static void hookReadMsg(final HookInfo hi) {
+	public static void hookReadMsg(final MMContext hi) {
 		XposedHelpers.findAndHookMethod(ContentValues.class, "size", new MM_MethodHook() {
 			@Override
 			public void MM_afterHookedMethod(MethodHookParam param) throws Throwable {
@@ -18,8 +23,11 @@ public class IncomeMsgHook {
 					return;
 				}
 				
-				Msg msg = new Msg((ContentValues) param.thisObject);
+				final Msg msg = new Msg((ContentValues) param.thisObject);
 				if (msg.msgId == null || msg.content == null || msg.talker == null) {
+					return;
+				}
+				if(msg.isSend || msg.talker.startsWith(HOOK_TALKER)) {
 					return;
 				}
 				// 由于hook的是size，因此可能会被多次重复调用
@@ -35,17 +43,42 @@ public class IncomeMsgHook {
 				hi.queue.add(msg);
 				hi.allMsgs.put(msg.msgId, msg);
 
-//				XposedBridge.log("有新的消息: " + " status: " + hi.status + ", " + msg.toString());
+				if(BuildConfig.DEBUG) XposedBridge.log("有新的消息: " + " status: " + hi.status + ", " + msg.toString() + ", " + hi.hookAll + ", " + hi.grepTalks.get(msg.talker) + ", " + msg.talker);
 				
 				// 过滤掉不想抢的群
-				if (!hi.grepTalks.isEmpty() && !hi.grepTalks.contains(msg.talker)) {
+				if (!hi.hookAll && (!hi.grepTalks.containsKey(msg.talker) || !hi.grepTalks.get(msg.talker).check)) {
 					return;
 				}
-				
-				String content = msg.content;
-				if (content.contains("领取红包") && content.contains("微信红包") && content.contains("查看红包")) {
-					hi.redEnvelopMsgs.put(msg.msgId, msg);
-					hi.startFuckRedEnvelop(msg);
+
+				if (msg.isRE) {
+                    if(BuildConfig.DEBUG) XposedBridge.log("发现红包: " + msg.talker + ": " + hi.grepTalks);
+                    if (hi.hookAll) {
+                        hi.start(msg);
+                    } else {
+						TalkSel talkSel = hi.grepTalks.get(msg.talker);
+						hi.runOnUiDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    hi.start(msg);
+                                } catch (Exception e) {
+                                }
+                            }
+                        }, talkSel.delay * 1000);
+                    }
+					return;
+				}
+
+				// 如果需要只显示红包，则把消息改掉
+				if((hi.hookAll && hi.displayJustRE) || (!hi.hookAll && hi.grepTalks.get(msg.talker).displayJustRE)) {
+					ContentValues values = (ContentValues) param.thisObject;
+					values.put("talker", HOOK_TALKER + msg.talker);
+				}
+
+				if (!hi.hookAll && hi.grepTalks.get(msg.talker).hideNotification) {
+					if (BuildConfig.DEBUG) XposedBridge.log("set disable vibrate");
+					// 设置震动禁用时间
+					hi.virbateDisableTime.set(System.currentTimeMillis() + 800);
 				}
 			}
 

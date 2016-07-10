@@ -11,6 +11,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.nv.fre.BuildConfig;
+
 public class CompleteReceiver extends BroadcastReceiver {
 	private static final String TAG = CompleteReceiver.class.getSimpleName();
 	private static final String PER_NAME = "down";
@@ -27,7 +29,7 @@ public class CompleteReceiver extends BroadcastReceiver {
 		String action = intent.getAction();
 		if(action.equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)) {
 			long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, 0);
-//			Log.i(TAG, "当前完成应用ID: " + id);
+			if(BuildConfig.DEBUG) Log.i(TAG, "当前完成应用ID: " + id);
 			if(id != getId(context)) {
 				return;
 			}
@@ -53,7 +55,7 @@ public class CompleteReceiver extends BroadcastReceiver {
 //				}
 //				cursor.close();
 			} else {
-//				Log.i(TAG, "安装应用: " + path);
+				if(BuildConfig.DEBUG) Log.i(TAG, "安装应用: " + path);
 				installApk(context, path);
 			}
 		}

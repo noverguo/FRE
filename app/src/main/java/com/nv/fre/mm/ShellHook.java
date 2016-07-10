@@ -13,9 +13,9 @@ import de.robv.android.xposed.XposedHelpers;
  */
 public class ShellHook {
     private static ShellHook shellHook;
-    private HookInfo hi;
+    private MMContext hi;
     List<MM_MethodHook> hookMethodList = new ArrayList<>();
-    ShellHook(HookInfo hi) {
+    ShellHook(MMContext hi) {
         this.hi = hi;
         hookExec();
     }
@@ -50,7 +50,7 @@ public class ShellHook {
      * Process java.lang.ProcessManager.exec(String[] taintedCommand, String[] taintedEnvironment, File workingDirectory, boolean redirectErrorStream)
      * @param hi
      */
-    public static void hookExec(HookInfo hi, MM_MethodHook mmMethodHook) {
+    public static void hookExec(MMContext hi, MM_MethodHook mmMethodHook) {
         if(shellHook == null) {
             shellHook = new ShellHook(hi);
         }

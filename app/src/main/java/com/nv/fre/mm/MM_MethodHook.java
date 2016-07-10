@@ -1,5 +1,7 @@
 package com.nv.fre.mm;
 
+import com.nv.fre.BuildConfig;
+
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 
@@ -15,7 +17,7 @@ public class MM_MethodHook extends XC_MethodHook {
 		try {
 			MM_beforeHookedMethod(param);
 		} catch(Throwable e) {
-//			XposedBridge.log(e);
+			if(BuildConfig.DEBUG) XposedBridge.log(e);
 		}
 		inHook = false;
 	}
@@ -29,7 +31,7 @@ public class MM_MethodHook extends XC_MethodHook {
 		try {
 			MM_afterHookedMethod(param);
 		} catch(Throwable e) {
-//			XposedBridge.log(e);
+			if(BuildConfig.DEBUG) XposedBridge.log(e);
 		}
 		inHook = false;
 	}
@@ -43,7 +45,7 @@ public class MM_MethodHook extends XC_MethodHook {
 		try {
 			MM_call(param);
 		} catch(Throwable e) {
-//			XposedBridge.log(e);
+			if(BuildConfig.DEBUG) XposedBridge.log(e);
 		}
 		inHook = false;
 	}

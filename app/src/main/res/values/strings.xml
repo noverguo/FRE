@@ -2,5 +2,12 @@
     <string name="app_name">我要抢</string>
 	<string name="hook_sel_all">幸福全靠你</string>
 	<string name="hook_sel_some">请手下留情</string>
+	<string name="hook_display_all">显示全部消息</string>
+	<string name="hook_display_just_re">只显示红包</string>
+    <string name="hook_delay_fuck">延时</string>
+    <string name="hook_hide_notification">隐藏通知</string>
+    <string name="delay_sec">秒</string>
+
+
 	<string name="fuck_red_envelope">抢抢抢</string>
 </resources>

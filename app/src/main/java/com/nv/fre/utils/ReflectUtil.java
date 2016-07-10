@@ -23,7 +23,7 @@ public class ReflectUtil {
 			fieldSet.addAll(Arrays.asList(fields));
 		}
 //		for(Field field : fieldSet) {
-//			XposedBridge.log("cacheFields: " + clazz.getName() + "." + field.getName());
+//			if(BuildConfig.DEBUG) XposedBridge.log("cacheFields: " + clazz.getName() + "." + field.getName());
 //		}
 		fieldMap.put(clazz, fieldSet);
 	}

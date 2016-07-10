@@ -1,54 +1,68 @@
 package com.nv.fre.ui;
 
 import android.app.DownloadManager;
-import android.app.PendingIntent;
-import android.app.PendingIntent.CanceledException;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
-import android.text.TextUtils;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
-import android.widget.LinearLayout;
+import android.widget.EditText;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.DialogAction;
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.nv.fre.BuildConfig;
 import com.nv.fre.Const;
-import com.nv.fre.FREApplication;
 import com.nv.fre.R;
 import com.nv.fre.Settings;
 import com.nv.fre.TalkSel;
+import com.nv.fre.adapter.HookItemAdapter;
 import com.nv.fre.api.GrpcServer;
-import com.nv.fre.mm.HookInfo;
+import com.nv.fre.holder.DialogConfigHolder;
 import com.nv.fre.receiver.CompleteReceiver;
+import com.nv.fre.receiver.MMSettingReceiver;
 import com.nv.fre.utils.PackageUtils;
+import com.nv.fre.utils.RxJavaUtils;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-import me.drakeet.materialdialog.MaterialDialog;
+import butterknife.Bind;
+import butterknife.ButterKnife;
+import rx.functions.Action1;
 
 public class SettingActivity extends AppCompatActivity {
 	private static final String TAG = SettingActivity.class.getSimpleName();
-	private CheckBox cbHookSel;
-	private LinearLayout llHookItems;
+	@Bind(R.id.hook_sel)
+	CheckBox cbHookSel;
+	@Bind(R.id.hook_display)
+	CheckBox cbHookDisplay;
+	@Bind(R.id.rv_list)
+	RecyclerView llHookItems;
+
 	HandlerThread bgThread;
 	Handler bgHandler;
+	HookItemAdapter hookItemAdapter;
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setUnlocked();
 		setContentView(R.layout.setting_ui);
+		ButterKnife.bind(this);
 		Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         toolbar.setLogo(R.mipmap.ic_launcher);
         toolbar.setOnClickListener(new View.OnClickListener() {
@@ -77,51 +91,133 @@ public class SettingActivity extends AppCompatActivity {
 		bgThread = new HandlerThread("bg");
 		bgThread.start();
 		bgHandler = new Handler(bgThread.getLooper());
-		currentActivity = this;
-		cbHookSel = (CheckBox) findViewById(R.id.hook_sel);
-		llHookItems = (LinearLayout) findViewById(R.id.hook_sel_items);
 
+		cbHookDisplay.setChecked(Settings.isDisplayJustRE());
+		cbHookDisplay.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+			@Override
+			public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
+				onTalkerCheckedChanged();
+			}
+		});
+		initRecycleView();
+
+		cbHookSel.setChecked(Settings.isHookAll());
 		cbHookSel.setOnCheckedChangeListener(new OnCheckedChangeListener() {
 			@Override
 			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-				if (isChecked) {
-					cbHookSel.setText(R.string.hook_sel_all);
-					llHookItems.setVisibility(View.GONE);
-					sendBroadcast(new Intent(HookInfo.ACTION_TALKS));
-				} else {
-					cbHookSel.setText(R.string.hook_sel_some);
-					initHookItems();
-					llHookItems.setVisibility(View.VISIBLE);
-				}
-				Settings.setHookAll(isChecked);
+				onHookAllCheck(isChecked);
 			}
-
 		});
-		cbHookSel.setChecked(Settings.isHookAll());
-		if(getIntent().getBooleanExtra(KEY_UNLOCK, false)) {
-			new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-				public void run() {
-					final Intent intent = new Intent();
-					intent.setClassName("com.tencent.mm", "com.tencent.mm.ui.LauncherUI");
-					intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-					intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-					// intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-					try {
-						PendingIntent.getActivity(SettingActivity.this, 4097, intent, PendingIntent.FLAG_UPDATE_CURRENT).send();
-					} catch (CanceledException e) {
-						e.printStackTrace();
-					}
-					finish();
-				}
-			}, 500);
-		}
+		onHookAllCheck(cbHookSel.isChecked());
 		checkUpdate();
 	}
+
+	private void onHookAllCheck(boolean isChecked) {
+		if (isChecked) {
+			cbHookDisplay.setVisibility(View.VISIBLE);
+			llHookItems.setVisibility(View.GONE);
+		} else {
+			cbHookDisplay.setVisibility(View.GONE);
+			llHookItems.setVisibility(View.VISIBLE);
+			initHookItems();
+		}
+		onTalkerCheckedChanged();
+	}
+
+	private void initRecycleView() {
+		llHookItems.setLayoutManager(new LinearLayoutManager(this));
+		hookItemAdapter = new HookItemAdapter(this, new HookItemAdapter.Callback(){
+			@Override
+			public void onCheckChange(boolean isChecked, TalkSel talkSel) {
+				onTalkerCheckedChanged();
+			}
+
+			@Override
+			public void onClick(final TalkSel talkSel) {
+				if (!talkSel.check) {
+					return;
+				}
+				MaterialDialog dialog = new MaterialDialog.Builder(SettingActivity.this).title(talkSel.showName + "的配置").customView(R.layout.dialog_config, false)
+						.positiveText("确定").build();
+				final DialogConfigHolder dialogConfigHolder = new DialogConfigHolder(dialog.getCustomView());
+				dialogConfigHolder.sbJustDisplayRE.setChecked(talkSel.displayJustRE);
+				dialogConfigHolder.sbJustDisplayRE.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+					@Override
+					public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
+						talkSel.displayJustRE = isCheck;
+						onTalkerCheckedChanged();
+					}
+				});
+
+				dialogConfigHolder.sbHideNotification.setChecked(talkSel.hideNotification);
+				dialogConfigHolder.sbHideNotification.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+					@Override
+					public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
+						talkSel.hideNotification = isCheck;
+						onTalkerCheckedChanged();
+					}
+				});
+
+				dialogConfigHolder.sbHookDelayFuck.setChecked(talkSel.delay > 0);
+				dialogConfigHolder.sbHookDelayFuck.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+					@Override
+					public void onCheckedChanged(CompoundButton compoundButton, boolean isCheck) {
+						int visiable = isCheck ? View.VISIBLE : View.GONE;
+						dialogConfigHolder.llDelayLayout.setVisibility(visiable);
+
+						if(isCheck) {
+							setEditText(dialogConfigHolder.etDelayTime, talkSel.delay + "");
+						} else {
+							talkSel.delay = 0;
+						}
+						onTalkerCheckedChanged();
+					}
+				});
+				int visiable = talkSel.delay > 0 ? View.VISIBLE : View.GONE;
+				dialogConfigHolder.llDelayLayout.setVisibility(visiable);
+				if(talkSel.delay > 0) {
+					setEditText(dialogConfigHolder.etDelayTime, talkSel.delay + "");
+				}
+
+				dialogConfigHolder.etDelayTime.addTextChangedListener(new TextWatcher() {
+					@Override
+					public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+					}
+
+					@Override
+					public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+					}
+
+					@Override
+					public void afterTextChanged(Editable editable) {
+						try {
+							talkSel.delay = Integer.parseInt(editable.toString());
+						} catch (NumberFormatException e) {
+							talkSel.delay = 0;
+						}
+						onTalkerCheckedChanged();
+					}
+				});
+				dialog.show();
+			}
+		});
+		llHookItems.setAdapter(hookItemAdapter);
+	}
+
+	private void setEditText(EditText editText, String text) {
+		editText.setText(text);
+		editText.setSelection(text.length());
+		editText.requestFocus();
+	}
+
+    private void setMMSetting() {
+        MMSettingReceiver.setSetting(getApplicationContext(), cbHookSel.isChecked(), cbHookDisplay.isChecked(), hookItemAdapter.get());
+    }
 
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-		currentActivity = null;
 	}
 
 	// 设置屏幕不能锁屏
@@ -132,65 +228,34 @@ public class SettingActivity extends AppCompatActivity {
 		win.setAttributes(winParams);
 	}
 
-	private static SettingActivity currentActivity;
-	public static final String KEY_UNLOCK = "key_unlock";
-	public static void unlock() {
-		if (currentActivity != null && !currentActivity.isFinishing()) {
-			currentActivity.finish();
-		}
-		FREApplication.getContext().startActivity(new Intent(FREApplication.getContext(), SettingActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(KEY_UNLOCK, true));
+	private void initHookItems() {
+		Log.i(TAG, "initHookItems");
+		llHookItems.removeAllViews();
+		RxJavaUtils.io2AndroidMain(Settings.getTalks()).subscribe(new Action1<List<TalkSel>>() {
+            @Override
+            public void call(List<TalkSel> talks) {
+                if (talks == null) {
+					talks = new ArrayList<>();
+                }
+				hookItemAdapter.set(talks);
+				onTalkerCheckedChanged();
+            }
+        });
 	}
 
-	private List<TalkSel> talkSels = new ArrayList<TalkSel>();
+	Runnable talkerChangeRunnable = new Runnable(){
+		@Override
+		public void run() {
+            Settings.setHookAll(cbHookSel.isChecked());
+            Settings.setDisplayJustRE(cbHookDisplay.isChecked());
+			Settings.setTalks(hookItemAdapter.get());
+            setMMSetting();
+		}
+	};
 
-	private void initHookItems() {
-		llHookItems.removeAllViews();
-		String[] talks = Settings.getTalks();
-		if (talks == null) {
-			return;
-		}
-		talkSels.clear();
-		Set<String> grepSet = new HashSet<String>();
-		for (String talk : talks) {
-			if (TextUtils.isEmpty(talk)) {
-				continue;
-			}
-			final TalkSel talkSel = new TalkSel(talk);
-			if(talkSel.talkName == null || grepSet.contains(talkSel.talkName)) {
-				continue;
-			}
-			grepSet.add(talkSel.talkName);
-			talkSels.add(talkSel);
-			CheckBox talkCheckItem = new CheckBox(this);
-			talkCheckItem.setText(TextUtils.isEmpty(talkSel.showName) ? talkSel.talkName : talkSel.showName);
-			talkCheckItem.setChecked(talkSel.check);
-			talkCheckItem.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-				@Override
-				public void onCheckedChanged(CompoundButton buttonView, final boolean isChecked) {
-					bgHandler.post(new Runnable(){
-						@Override
-						public void run() {
-							talkSel.check = isChecked;
-							String[] saveValues = new String[talkSels.size()];
-							List<String> grepTalks = new ArrayList<String>();
-							for (int i = 0; i < saveValues.length; ++i) {
-								TalkSel curTalkSel = talkSels.get(i);
-								saveValues[i] = curTalkSel.toString();
-								if(curTalkSel.check) {
-									grepTalks.add(curTalkSel.talkName);
-								}
-							}
-							if(grepTalks.isEmpty()) {
-								grepTalks.add("null_name");
-							}
-							sendBroadcast(new Intent(HookInfo.ACTION_TALKS).putExtra(HookInfo.KEY_TALKS, grepTalks.toArray(new String[grepTalks.size()])));
-							Settings.setTalks(saveValues);
-						}
-					});
-				}
-			});
-			llHookItems.addView(talkCheckItem);
-		}
+	private void onTalkerCheckedChanged() {
+		bgHandler.removeCallbacks(talkerChangeRunnable);
+		bgHandler.postDelayed(talkerChangeRunnable, 800);
 	}
 
 	private void checkUpdate() {
@@ -227,11 +292,13 @@ public class SettingActivity extends AppCompatActivity {
 		if(!inFront) {
 			return;
 		}
-		final MaterialDialog mMaterialDialog = new MaterialDialog(this);
-		mMaterialDialog.setTitle("版本更新").setMessage("有重要版本更新，是否开始下载？")
-				.setPositiveButton("马上下载", new View.OnClickListener() {
+		new MaterialDialog.Builder(this)
+				.title("版本更新").content("有重要版本更新，是否开始下载？")
+				.positiveText("马上下载")
+				.negativeText("下次吧")
+				.onPositive(new MaterialDialog.SingleButtonCallback() {
 					@Override
-					public void onClick(View v) {
+					public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
 						DownloadManager downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
 						DownloadManager.Request downloadReq = new DownloadManager.Request(Uri.parse(url));
 						downloadReq.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE | DownloadManager.Request.NETWORK_WIFI);
@@ -240,17 +307,8 @@ public class SettingActivity extends AppCompatActivity {
 						downloadReq.setDescription(getString(R.string.app_name) + " 最新安装包");
 						long id = downloadManager.enqueue(downloadReq);
 						CompleteReceiver.setId(getApplicationContext(), id);
-//						Log.i(TAG, "应用ID: " + id);
-						mMaterialDialog.dismiss();
+						if(BuildConfig.DEBUG) Log.i(TAG, "应用ID: " + id);
 					}
-				})
-				.setNegativeButton("下次吧", new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						mMaterialDialog.dismiss();
-					}
-				});
-
-		mMaterialDialog.show();
+				}).show();
 	}
 }
