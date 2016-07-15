@@ -10,6 +10,7 @@ import android.widget.CompoundButton;
 import android.widget.TextView;
 
 import com.kyleduo.switchbutton.SwitchButton;
+import com.nv.fre.BuildConfig;
 import com.nv.fre.R;
 import com.nv.fre.TalkSel;
 
@@ -48,14 +49,14 @@ public class HookItemAdapter extends RecyclerView.Adapter<HookItemAdapter.HookIt
             grepSet.add(talkSel.talkName);
         }
         notifyDataSetChanged();
-        Log.i("HookItemAdapter", "HookItemAdapter.set: " + this.talks.size() + ", " + talks.size());
+        if (BuildConfig.DEBUG) Log.i("HookItemAdapter", "HookItemAdapter.set: " + this.talks.size() + ", " + talks.size());
     }
     public List<TalkSel> get() {
         return new ArrayList<>(talks);
     }
     @Override
     public HookItemViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        Log.i("HookItemAdapter", "HookItemAdapter.onCreateViewHolder");
+        if (BuildConfig.DEBUG) Log.i("HookItemAdapter", "HookItemAdapter.onCreateViewHolder");
         return new HookItemViewHolder(inflater.inflate(R.layout.talk_item, parent, false));
     }
 

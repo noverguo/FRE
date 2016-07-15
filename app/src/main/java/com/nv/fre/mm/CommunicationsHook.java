@@ -203,9 +203,9 @@ public class CommunicationsHook {
 			if(BuildConfig.DEBUG) XposedBridge.log("聊天室列表getView: displayName: " + displayName);
             if (!hi.grepTalks.containsKey(userName)) {
                 hi.grepTalks.put(userName, new TalkSel(userName, displayName));
-                hi.updateTalks();
                 postUploadTalkers();
             }
+			hi.updateTalks();
             synchronized (conversationViewPosMap) {
                 // 缓存聊天室列表
                 if (!init) {

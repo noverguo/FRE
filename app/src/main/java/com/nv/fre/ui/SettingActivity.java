@@ -110,6 +110,7 @@ public class SettingActivity extends AppCompatActivity {
 		});
 		onHookAllCheck(cbHookSel.isChecked());
 		checkUpdate();
+		Toast.makeText(getApplicationContext(), "当前微信版本: " + PackageUtils.getVersionName(getApplicationContext(), Const.MM_PACKAGE_NAME) + ", " + PackageUtils.getVersionCode(getApplicationContext(), Const.MM_PACKAGE_NAME), Toast.LENGTH_LONG).show();
 	}
 
 	private void onHookAllCheck(boolean isChecked) {
@@ -229,7 +230,7 @@ public class SettingActivity extends AppCompatActivity {
 	}
 
 	private void initHookItems() {
-		Log.i(TAG, "initHookItems");
+		if (BuildConfig.DEBUG) Log.i(TAG, "initHookItems");
 		llHookItems.removeAllViews();
 		RxJavaUtils.io2AndroidMain(Settings.getTalks()).subscribe(new Action1<List<TalkSel>>() {
             @Override
